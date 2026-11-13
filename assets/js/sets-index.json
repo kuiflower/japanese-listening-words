@@ -1,0 +1,12 @@
+{
+  "sets": [
+    {
+      "id": "2026-07-n2",
+      "title": "2026年7月 N2 真题听力单词",
+      "level": "N2",
+      "path": "2026-07-n2/words.json",
+      "metaPath": "2026-07-n2/meta.json"
+    }
+  ],
+  "allWordsDefinition": "所有已导入并完成抽取的词条合集（当前 = 上表各套合并）"
+}

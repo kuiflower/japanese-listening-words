@@ -1,0 +1,19 @@
+.DS_Store
+*.log
+.env
+.env.*
+.venv/
+__pycache__/
+node_modules/
+.idea/
+.vscode/
+
+# OCR 扫描页与临时抽取（含真题图像，不入库）
+docs/ocr/
+docs/raw-*.txt
+docs/**/*.png
+docs/**/*.jpg
+
+# Python / 本地工具缓存
+*.pyc
+.pytest_cache/
