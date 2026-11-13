@@ -7,7 +7,7 @@ import {
   saveFavorites,
   saveProgress,
   saveSettings,
-} from "./storage.js?v=20";
+} from "./storage.js?v=21";
 import {
   findVoiceByFamily,
   getDefaultJaVoice,
@@ -26,7 +26,7 @@ import {
   voiceSettingsPathHint,
   voiceShortLabel,
   wait,
-} from "./tts.js?v=20";
+} from "./tts.js?v=21";
 
 const root = document.getElementById("app");
 const data = window.APP_DATA || { sets: [] };
@@ -807,17 +807,30 @@ async function showStudyEntry({
 }
 
 /**
- * 题号框以下、底栏以上整块滑动区：
- * 位移很小 = 点击（交给原有 click）；位移够大 = 滑动切题。
+ * 题号框以下、底栏以上整块滑动区（含按钮/遮罩上起手也可滑）：
+ * 位移很小 = 点击；位移够大 = 滑动切题，并吞掉随后的 click，避免误触按钮。
  */
 function setupStudySwipeOnce() {
   if (window.__studySwipeReady) return;
   window.__studySwipeReady = true;
 
   const CLICK_SLOP = 14;
-  const SWIPE_MIN = 52;
+  const SWIPE_MIN = 48;
+  let suppressClickUntil = 0;
 
-  const interactiveSel = "input, textarea, button, a, .mask, .action-row, .jump-row";
+  // 仅排除真正需要输入的控件；按钮/遮罩上也可以开始滑动
+  const noSwipeStartSel = "input, textarea, select";
+
+  document.addEventListener(
+    "click",
+    (e) => {
+      if (Date.now() >= suppressClickUntil) return;
+      if (!e.target.closest?.("#swipeZone")) return;
+      e.preventDefault();
+      e.stopPropagation();
+    },
+    true,
+  );
 
   document.addEventListener(
     "pointerdown",
@@ -825,7 +838,7 @@ function setupStudySwipeOnce() {
       if (route.name !== "study") return;
       const zone = e.target.closest?.("#swipeZone");
       if (!zone) return;
-      if (e.target.closest?.(interactiveSel)) {
+      if (e.target.closest?.(noSwipeStartSel)) {
         swipeGesture = null;
         return;
       }
@@ -836,6 +849,11 @@ function setupStudySwipeOnce() {
         y0: e.clientY,
         maxDist: 0,
       };
+      try {
+        zone.setPointerCapture?.(e.pointerId);
+      } catch {
+        /* ignore */
+      }
     },
     { passive: true },
   );
@@ -861,16 +879,18 @@ function setupStudySwipeOnce() {
     const dy = e.clientY - g.y0;
     const dist = Math.max(g.maxDist, Math.hypot(dx, dy));
 
-    // 近似点击：不拦截，让 mask/空白区域的 click 正常发生
+    // 近似点击：不拦截，按钮 / 遮罩的 click 正常触发
     if (dist < CLICK_SLOP) return;
     if (dist < SWIPE_MIN) return;
 
     const absX = Math.abs(dx);
     const absY = Math.abs(dy);
-    const horizontal = absX >= absY * 0.9;
+    const horizontal = absX >= absY * 0.85;
     const vertical = absY > absX * 1.05;
     if (!horizontal && !vertical) return;
 
+    // 判定为滑动：抑制随后合成的 click，避免滑过按钮时误点
+    suppressClickUntil = Date.now() + 450;
     unlockTTSFromGesture();
     if (horizontal) {
       if (dx < 0) moveNext({ fromAuto: false });
@@ -882,9 +902,13 @@ function setupStudySwipeOnce() {
   };
 
   document.addEventListener("pointerup", endGesture, { passive: true });
-  document.addEventListener("pointercancel", () => {
-    swipeGesture = null;
-  }, { passive: true });
+  document.addEventListener(
+    "pointercancel",
+    () => {
+      swipeGesture = null;
+    },
+    { passive: true },
+  );
 }
 
 function escapeAttr(s) {
