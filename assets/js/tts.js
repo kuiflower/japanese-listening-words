@@ -271,22 +271,18 @@ export function findJaVoiceByURI(want) {
 }
 
 /**
- * 只返回「本机 getVoices 里确实找不到」的推荐项。
- * 会先宽松扫描全部音色；找到则不算未下载（由 listJaVoices 出真实按钮）。
+ * Android：本机列表里没有的推荐包。
+ * Apple：O-Ren/Otoya 常已下载但不进网页列表，不再假装「未下载」，改走「系统日语默认」。
  */
 export function getMissingJaRecommendations(platform = "other") {
+  if (platform === "apple") return [];
   const catalog =
-    platform === "apple"
+    platform === "android"
       ? [
-          { id: "otoya", family: "otoya", label: "Otoya" },
-          { id: "oren", family: "oren", label: "O-Ren" },
+          { id: "google-ja", family: "google-ja", label: "Google 日本語" },
+          { id: "nanami", family: "nanami", label: "Nanami" },
         ]
-      : platform === "android"
-        ? [
-            { id: "google-ja", family: "google-ja", label: "Google 日本語" },
-            { id: "nanami", family: "nanami", label: "Nanami" },
-          ]
-        : [];
+      : [];
   return catalog
     .filter((item) => !findVoiceByFamily(item.family))
     .map((item) => ({ ...item, status: "missing" }));
@@ -327,14 +323,28 @@ export function voiceShortLabel(v) {
 }
 
 /**
- * 校正设置里的 jaVoiceURI：去掉旧的「跟随系统/自动」占位，对齐本机真实音色。
- * 返回是否改写了 settings。
+ * 校正设置里的 jaVoiceURI。
+ * `__system__` = 不指定 voice，只设 lang=ja-JP，尽量用系统「朗读内容」里的日语默认声。
  */
 export function syncJaVoiceSetting(settings = {}) {
-  const jaList = listJaVoices();
-  if (!jaList.length) return { settings, changed: false, voice: null };
-
   const want = settings.jaVoiceURI;
+  if (want === "__system__") {
+    return { settings, changed: false, voice: null };
+  }
+
+  const jaList = listJaVoices();
+  if (!jaList.length) {
+    // 网页一个日语声都没有时，退回系统日语默认模式
+    if (want !== "__system__") {
+      return {
+        settings: { ...settings, jaVoiceURI: "__system__" },
+        changed: true,
+        voice: null,
+      };
+    }
+    return { settings, changed: false, voice: null };
+  }
+
   let found = findJaVoiceByURI(want);
   if (!found) found = getDefaultJaVoice();
   const nextURI = voiceKey(found);
@@ -364,11 +374,21 @@ export function pickVoices(settings = {}) {
     .filter((v) => scoreZh(v) >= 0)
     .sort((a, b) => scoreZh(b) - scoreZh(a));
 
-  const ja = findJaVoiceByURI(settings.jaVoiceURI) || getDefaultJaVoice();
+  let ja = null;
+  let jaName = "未检测到日语声";
+  if (settings.jaVoiceURI === "__system__") {
+    // 不指定具体 voice，让系统按 ja-JP 默认声朗读（有机会用到已下载的 O-Ren/Otoya）
+    ja = null;
+    jaName = "系统日语默认";
+  } else {
+    ja = findJaVoiceByURI(settings.jaVoiceURI) || getDefaultJaVoice();
+    jaName = voiceShortLabel(ja) || "未检测到日语声";
+  }
+
   return {
     ja,
     zh: zhList[0] || null,
-    jaName: voiceShortLabel(ja) || "未检测到日语声",
+    jaName,
     zhName: voiceShortLabel(zhList[0]) || "系统默认中文",
     jaList,
   };

@@ -7,7 +7,7 @@ import {
   saveFavorites,
   saveProgress,
   saveSettings,
-} from "./storage.js?v=17";
+} from "./storage.js?v=18";
 import {
   findVoiceByFamily,
   getDefaultJaVoice,
@@ -26,7 +26,7 @@ import {
   voiceSettingsPathHint,
   voiceShortLabel,
   wait,
-} from "./tts.js?v=17";
+} from "./tts.js?v=18";
 
 const root = document.getElementById("app");
 const data = window.APP_DATA || { sets: [] };
@@ -95,21 +95,33 @@ function ensureSyncedJaVoice() {
 }
 
 function voiceOptionButtonsHtml() {
-  const { platform } = detectClient();
+  const { platform, isApple } = detectClient();
   const jaList = listJaVoices();
-  const current = settings.jaVoiceURI || voiceKey(getDefaultJaVoice());
-  const defaultKey = voiceKey(getDefaultJaVoice());
+  const current = settings.jaVoiceURI || (isApple ? "__system__" : voiceKey(getDefaultJaVoice()));
+  const listedKey = voiceKey(getDefaultJaVoice());
 
-  const chips = jaList.map((v) => {
+  const chips = [];
+  if (isApple) {
+    chips.push({
+      kind: "pick",
+      value: "__system__",
+      label: "系统日语默认",
+      active: current === "__system__",
+    });
+  }
+
+  for (const v of jaList) {
     const value = voiceKey(v);
-    const isDefault = value === defaultKey;
-    return {
+    chips.push({
       kind: "pick",
       value,
-      label: isDefault ? `${voiceShortLabel(v)} · 系统默认` : voiceShortLabel(v),
+      label:
+        value === listedKey && current !== "__system__"
+          ? `${voiceShortLabel(v)} · 列表默认`
+          : voiceShortLabel(v),
       active: current === value,
-    };
-  });
+    });
+  }
 
   for (const item of getMissingJaRecommendations(platform)) {
     chips.push({
@@ -139,12 +151,13 @@ function voiceDownloadGuideHtml() {
   if (isApple) {
     return `
       <div class="voice-guide">
-        <strong>iPhone / iPad 下载日语声</strong>
+        <strong>iPhone 想用 O-Ren / Otoya 时</strong>
         <ol>
-          <li><strong>设置 → 辅助功能 → 朗读内容 → 声音 → 日语</strong></li>
-          <li>下载想要的音色（如 Otoya 优质 / 增强，带云图标）</li>
-          <li>设为日语默认后回到本站，点 <strong>刷新音色列表</strong></li>
+          <li>系统 <strong>设置 → 辅助功能 → 朗读内容 → 声音 → 日语</strong>，下载并设为默认</li>
+          <li>回到本站，音色选 <strong>系统日语默认</strong>（不要选 Kyoko）</li>
+          <li>点试听：若仍是 Kyoko，说明该音色<strong>不交给网页</strong>，网页端无法单独点选</li>
         </ol>
+        <p style="margin:8px 0 0">列表里能点的，才是网页真正可用的声。O-Ren/Otoya 优质档常只给系统朗读用。</p>
       </div>`;
   }
   if (isAndroid) {
@@ -168,7 +181,7 @@ function homeVoiceTipHtml() {
   if (isVoiceTipDismissed()) return "";
   const { isApple, isAndroid } = detectClient();
   const tip = isApple
-    ? "音质取决于系统已下载的日语声。可到「设置 → 辅助功能 → 朗读内容 → 声音 → 日语」下载后，回本站点刷新。"
+    ? "若已下载 O-Ren/Otoya 但列表没有：到系统把日语默认设成它，本站选 <strong>系统日语默认</strong>。网页有时仍用不了优质档。"
     : isAndroid
       ? "请安装 Google 文字转语音的日语包，再到本站「设置」刷新音色。"
       : "手机练习时请先在系统下载日语朗读声，再到设置里刷新选择。";
@@ -908,7 +921,11 @@ document.addEventListener("click", (e) => {
     if (key === "jaVoiceURI") {
       unlockTTSFromGesture();
       previewJapaneseVoice(settings);
-      showToast("已切换并试听");
+      if (value === "__system__") {
+        showToast("已用系统日语默认。请确认系统里日语默认是 O-Ren/Otoya", 3600);
+      } else {
+        showToast("已切换并试听");
+      }
     } else {
       showToast("已保存");
     }

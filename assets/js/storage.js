@@ -12,7 +12,8 @@ export const defaultSettings = {
   dictation: true,
   sleepMinutes: 0,
   filterType: "全部",
-  jaVoiceURI: "",
+  // iPhone 默认走系统日语默认（不指定 voice），才有机会用到网页列不出的 O-Ren/Otoya
+  jaVoiceURI: "__system__",
 };
 
 export function loadSettings() {
