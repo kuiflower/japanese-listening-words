@@ -633,65 +633,69 @@ function renderStudy() {
         <button class="icon-btn" data-go="${settingsHash}" aria-label="设置">${iconGear()}</button>
       </div>
 
-      <div class="jump-row">
-        <input id="jumpInput" inputmode="text" enterkeyhint="go" placeholder="题号跳转，如 2-4" value="${
-          study.jumpValue || ""
-        }" />
-        <button type="button" id="jumpBtn">跳转</button>
-      </div>
-
-      <div class="card">
-        <div class="meta-row">
-          ${typeChip(entry.type)}
-          <span class="chip">来源：問題${entry.mondai} · ${entry.ban}番</span>
-          ${
-            settings.sleepMinutes && study.auto
-              ? `<span class="timer-pill">睡觉 ${settings.sleepMinutes} 分</span>`
-              : ""
-          }
-        </div>
-        <div class="word-main">${entry.word}</div>
-        <div class="kana">${entry.kana}</div>
-
-        <div class="meaning">
-          <span class="label">中文意思</span>
-          <div class="body">${entry.meaning}</div>
-          ${
-            settings.dictation && !study.revealMeaning
-              ? `<div class="mask" data-unmask="meaning">点击显示意思</div>`
-              : ""
-          }
+      <div class="swipe-zone" id="swipeZone">
+        <div class="jump-row">
+          <input id="jumpInput" inputmode="text" enterkeyhint="go" placeholder="题号跳转，如 2-4" value="${
+            study.jumpValue || ""
+          }" />
+          <button type="button" id="jumpBtn">跳转</button>
         </div>
 
-        <div class="explain">
-          <span class="label">解释 · 来源句</span>
-          <div class="body">
-            <div class="source-ja">${entry.sourceJa}</div>
-            <div>${entry.sourceZh}</div>
+        <div class="card">
+          <div class="meta-row">
+            ${typeChip(entry.type)}
+            <span class="chip">来源：問題${entry.mondai} · ${entry.ban}番</span>
+            ${
+              settings.sleepMinutes && study.auto
+                ? `<span class="timer-pill">睡觉 ${settings.sleepMinutes} 分</span>`
+                : ""
+            }
           </div>
-          ${
-            settings.dictation && !study.revealExplain
-              ? `<div class="mask" data-unmask="explain">点击显示解释</div>`
-              : ""
-          }
-        </div>
+          <div class="word-main">${entry.word}</div>
+          <div class="kana">${entry.kana}</div>
 
-        <div class="action-row">
-          <button class="btn primary" id="replayBtn">再听一遍</button>
-          <button class="btn ghost ${fav ? "active" : ""}" id="favBtn">${
-            fav ? "取消收藏" : "收藏"
-          }</button>
+          <div class="meaning">
+            <span class="label">中文意思</span>
+            <div class="body">${entry.meaning}</div>
+            ${
+              settings.dictation && !study.revealMeaning
+                ? `<div class="mask" data-unmask="meaning">点击显示意思</div>`
+                : ""
+            }
+          </div>
+
+          <div class="explain">
+            <span class="label">解释 · 来源句</span>
+            <div class="body">
+              <div class="source-ja">${entry.sourceJa}</div>
+              <div>${entry.sourceZh}</div>
+            </div>
+            ${
+              settings.dictation && !study.revealExplain
+                ? `<div class="mask" data-unmask="explain">点击显示解释</div>`
+                : ""
+            }
+          </div>
+
+          <div class="action-row">
+            <button class="btn primary ${study.auto ? "is-auto" : ""}" id="autoBtn">
+              ${study.auto ? "暂停" : "自动播放"}
+            </button>
+            <button class="btn ghost ${fav ? "active" : ""}" id="favBtn">${
+              fav ? "取消收藏" : "收藏"
+            }</button>
+          </div>
         </div>
       </div>
     </div>
 
     <div class="dock">
       <button class="dock-btn" id="prevBtn"><strong>上一个</strong><span>Prev</span></button>
-      <button class="dock-btn main" id="autoBtn"><strong>${
-        study.auto ? "暂停" : "自动播放"
-      }</strong><span>${study.auto ? "手动模式" : "连播"}</span></button>
+      <button class="dock-btn main" id="replayBtn"><strong>再听一遍</strong><span>Replay</span></button>
       <button class="dock-btn" id="nextBtn"><strong>下一个</strong><span>Next</span></button>
     </div>`;
+
+  bindStudySwipe();
 
   if (study.auto && sleepDeadline) {
     clearInterval(window.__sleepTick);
@@ -702,6 +706,79 @@ function renderStudy() {
       span.textContent = `${study.index + 1} / ${study.list.length}${t ? ` · 睡觉 ${t}` : ""}`;
     }, 1000);
   }
+}
+
+/** 内容区左右滑动 = 上一个 / 下一个（与底栏切题同一套逻辑） */
+function bindStudySwipe() {
+  const zone = document.getElementById("swipeZone");
+  if (!zone || zone.dataset.swipeBound === "1") return;
+  zone.dataset.swipeBound = "1";
+
+  let startX = 0;
+  let startY = 0;
+  let tracking = false;
+
+  const onStart = (x, y, target) => {
+    if (target?.closest?.("input, textarea, button, a, .mask")) {
+      tracking = false;
+      return;
+    }
+    startX = x;
+    startY = y;
+    tracking = true;
+  };
+
+  const onEnd = (x, y) => {
+    if (!tracking) return;
+    tracking = false;
+    if (!study?.list?.length) return;
+    const dx = x - startX;
+    const dy = y - startY;
+    const absX = Math.abs(dx);
+    const absY = Math.abs(dy);
+    // 横向为主；也允许近似“上下一体”：明显纵向滑动同样切题
+    const horizontal = absX >= 56 && absX > absY * 0.85;
+    const vertical = absY >= 72 && absY > absX * 1.15;
+    if (!horizontal && !vertical) return;
+    unlockTTSFromGesture();
+    if (horizontal) {
+      if (dx < 0) moveNext({ fromAuto: false });
+      else movePrev();
+      return;
+    }
+    // 上滑下一个、下滑上一个
+    if (dy < 0) moveNext({ fromAuto: false });
+    else movePrev();
+  };
+
+  zone.addEventListener(
+    "touchstart",
+    (e) => {
+      const t = e.changedTouches?.[0];
+      if (!t) return;
+      onStart(t.clientX, t.clientY, e.target);
+    },
+    { passive: true },
+  );
+  zone.addEventListener(
+    "touchend",
+    (e) => {
+      const t = e.changedTouches?.[0];
+      if (!t) return;
+      onEnd(t.clientX, t.clientY);
+    },
+    { passive: true },
+  );
+
+  zone.addEventListener("pointerdown", (e) => {
+    if (e.pointerType === "touch") return;
+    if (e.button !== 0) return;
+    onStart(e.clientX, e.clientY, e.target);
+  });
+  zone.addEventListener("pointerup", (e) => {
+    if (e.pointerType === "touch") return;
+    onEnd(e.clientX, e.clientY);
+  });
 }
 
 function escapeAttr(s) {
