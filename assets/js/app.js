@@ -7,7 +7,7 @@ import {
   saveFavorites,
   saveProgress,
   saveSettings,
-} from "./storage.js?v=18";
+} from "./storage.js?v=20";
 import {
   findVoiceByFamily,
   getDefaultJaVoice,
@@ -26,7 +26,7 @@ import {
   voiceSettingsPathHint,
   voiceShortLabel,
   wait,
-} from "./tts.js?v=18";
+} from "./tts.js?v=20";
 
 const root = document.getElementById("app");
 const data = window.APP_DATA || { sets: [] };
@@ -45,6 +45,9 @@ let playAbort = null;
 let wakeLock = null;
 let wakeLockWanted = false;
 let keepAliveVideo = null;
+/** 翻页动画进行中，避免连滑叠动画 */
+let studyAnimating = false;
+let swipeGesture = null;
 
 function parseHash() {
   const raw = location.hash.replace(/^#/, "") || "/";
@@ -375,7 +378,7 @@ async function playCurrent({ autoAdvance = false } = {}) {
       clearSleepTimer();
       releaseWakeLock();
       showToast("已到列表末尾");
-      render();
+      patchStudyChrome();
       return;
     }
 
@@ -383,7 +386,7 @@ async function playCurrent({ autoAdvance = false } = {}) {
     study.index = nIdx;
     resetReveal();
     persistIndex();
-    render();
+    await showStudyEntry({ direction: "next", play: false });
     autoAdvance = true;
   }
 }
@@ -401,34 +404,38 @@ function resetReveal() {
 }
 
 function movePrev() {
-  if (!study?.list.length) return;
+  if (!study?.list.length || studyAnimating) return;
+  const prevIndex = study.index;
   if (settings.listLoop) {
     study.index = (study.index - 1 + study.list.length) % study.list.length;
   } else {
     study.index = Math.max(0, study.index - 1);
   }
+  if (study.index === prevIndex && !settings.listLoop) return;
   resetReveal();
   persistIndex();
-  render();
-  playCurrent({ autoAdvance: !!study.auto });
+  showStudyEntry({ direction: "prev", play: true, autoAdvance: !!study.auto });
 }
 
 function moveNext({ fromAuto = false } = {}) {
-  if (!study?.list.length) return;
+  if (!study?.list.length || studyAnimating) return;
   const nIdx = nextIndexFrom(study.index);
   if (nIdx == null) {
     study.auto = false;
     clearSleepTimer();
     releaseWakeLock();
     showToast("已到列表末尾");
-    render();
+    patchStudyChrome();
     return;
   }
   study.index = nIdx;
   resetReveal();
   persistIndex();
-  render();
-  playCurrent({ autoAdvance: !!study.auto || fromAuto });
+  showStudyEntry({
+    direction: "next",
+    play: true,
+    autoAdvance: !!study.auto || fromAuto,
+  });
 }
 
 function toggleAuto() {
@@ -437,13 +444,14 @@ function toggleAuto() {
   if (study.auto) {
     armSleepTimer();
     requestWakeLock();
-    render();
+    patchStudyChrome();
+    armStudyProgressTicker();
     playCurrent({ autoAdvance: true });
   } else {
     clearSleepTimer();
     abortPlay();
     releaseWakeLock();
-    render();
+    patchStudyChrome();
     showToast("已切换为手动模式");
   }
 }
@@ -468,8 +476,7 @@ function jumpToBan() {
   study.index = idx;
   resetReveal();
   persistIndex();
-  render();
-  playCurrent({ autoAdvance: !!study.auto });
+  showStudyEntry({ direction: "next", play: true, autoAdvance: !!study.auto });
   showToast(`已跳到 ${study.list[idx].jumpId}`);
 }
 
@@ -482,9 +489,23 @@ function toggleFavorite(id) {
     study.list = list;
     if (!list.length) {
       study.index = 0;
-    } else if (study.index >= list.length) {
-      study.index = list.length - 1;
+      render();
+      return;
     }
+    if (study.index >= list.length) study.index = list.length - 1;
+    const stage = document.querySelector(".card-stage");
+    if (stage) {
+      stage.innerHTML = studyCardHtml(study.list[study.index]);
+      patchStudyChrome();
+      return;
+    }
+  }
+  const favBtn = document.getElementById("favBtn");
+  if (favBtn && study?.list[study.index]?.id === id) {
+    const on = favorites.has(id);
+    favBtn.textContent = on ? "取消收藏" : "收藏";
+    favBtn.classList.toggle("active", on);
+    return;
   }
   render();
 }
@@ -619,7 +640,6 @@ function renderStudy() {
     return;
   }
 
-  const fav = favorites.has(entry.id);
   const timer = sleepLabel();
 
   root.innerHTML = `
@@ -628,63 +648,23 @@ function renderStudy() {
         <button class="icon-btn" data-go="#/" aria-label="返回">${iconBack()}</button>
         <div class="center">
           <strong>${studyTitle(route)}</strong>
-          <span>${study.index + 1} / ${list.length}${timer ? ` · 睡觉 ${timer}` : ""}</span>
+          <span id="studyProgress">${study.index + 1} / ${list.length}${
+            timer ? ` · 睡觉 ${timer}` : ""
+          }</span>
         </div>
         <button class="icon-btn" data-go="${settingsHash}" aria-label="设置">${iconGear()}</button>
       </div>
 
-      <div class="swipe-zone" id="swipeZone">
-        <div class="jump-row">
-          <input id="jumpInput" inputmode="text" enterkeyhint="go" placeholder="题号跳转，如 2-4" value="${
-            study.jumpValue || ""
-          }" />
-          <button type="button" id="jumpBtn">跳转</button>
-        </div>
+      <div class="jump-row">
+        <input id="jumpInput" inputmode="text" enterkeyhint="go" placeholder="题号跳转，如 2-4" value="${
+          study.jumpValue || ""
+        }" />
+        <button type="button" id="jumpBtn">跳转</button>
+      </div>
 
-        <div class="card">
-          <div class="meta-row">
-            ${typeChip(entry.type)}
-            <span class="chip">来源：問題${entry.mondai} · ${entry.ban}番</span>
-            ${
-              settings.sleepMinutes && study.auto
-                ? `<span class="timer-pill">睡觉 ${settings.sleepMinutes} 分</span>`
-                : ""
-            }
-          </div>
-          <div class="word-main">${entry.word}</div>
-          <div class="kana">${entry.kana}</div>
-
-          <div class="meaning">
-            <span class="label">中文意思</span>
-            <div class="body">${entry.meaning}</div>
-            ${
-              settings.dictation && !study.revealMeaning
-                ? `<div class="mask" data-unmask="meaning">点击显示意思</div>`
-                : ""
-            }
-          </div>
-
-          <div class="explain">
-            <span class="label">解释 · 来源句</span>
-            <div class="body">
-              <div class="source-ja">${entry.sourceJa}</div>
-              <div>${entry.sourceZh}</div>
-            </div>
-            ${
-              settings.dictation && !study.revealExplain
-                ? `<div class="mask" data-unmask="explain">点击显示解释</div>`
-                : ""
-            }
-          </div>
-
-          <div class="action-row">
-            <button class="btn primary ${study.auto ? "is-auto" : ""}" id="autoBtn">
-              ${study.auto ? "暂停" : "自动播放"}
-            </button>
-            <button class="btn ghost ${fav ? "active" : ""}" id="favBtn">${
-              fav ? "取消收藏" : "收藏"
-            }</button>
-          </div>
+      <div class="swipe-zone" id="swipeZone" aria-label="滑动切换题目">
+        <div class="card-stage">
+          ${studyCardHtml(entry)}
         </div>
       </div>
     </div>
@@ -695,90 +675,216 @@ function renderStudy() {
       <button class="dock-btn" id="nextBtn"><strong>下一个</strong><span>Next</span></button>
     </div>`;
 
-  bindStudySwipe();
+  armStudyProgressTicker();
+}
 
-  if (study.auto && sleepDeadline) {
-    clearInterval(window.__sleepTick);
-    window.__sleepTick = setInterval(() => {
-      const span = document.querySelector(".study-header .center span");
-      if (!span || !study?.auto) return;
-      const t = sleepLabel();
-      span.textContent = `${study.index + 1} / ${study.list.length}${t ? ` · 睡觉 ${t}` : ""}`;
-    }, 1000);
+function studyCardHtml(entry) {
+  const fav = favorites.has(entry.id);
+  return `
+    <article class="card" id="studyCard">
+      <div class="meta-row">
+        ${typeChip(entry.type)}
+        <span class="chip">来源：問題${entry.mondai} · ${entry.ban}番</span>
+        ${
+          settings.sleepMinutes && study.auto
+            ? `<span class="timer-pill">睡觉 ${settings.sleepMinutes} 分</span>`
+            : ""
+        }
+      </div>
+      <div class="word-main">${entry.word}</div>
+      <div class="kana">${entry.kana}</div>
+      <div class="meaning">
+        <span class="label">中文意思</span>
+        <div class="body">${entry.meaning}</div>
+        ${
+          settings.dictation && !study.revealMeaning
+            ? `<div class="mask" data-unmask="meaning">点击显示意思</div>`
+            : ""
+        }
+      </div>
+      <div class="explain">
+        <span class="label">解释 · 来源句</span>
+        <div class="body">
+          <div class="source-ja">${entry.sourceJa}</div>
+          <div>${entry.sourceZh}</div>
+        </div>
+        ${
+          settings.dictation && !study.revealExplain
+            ? `<div class="mask" data-unmask="explain">点击显示解释</div>`
+            : ""
+        }
+      </div>
+      <div class="action-row">
+        <button class="btn primary ${study.auto ? "is-auto" : ""}" id="autoBtn">
+          ${study.auto ? "暂停" : "自动播放"}
+        </button>
+        <button class="btn ghost ${fav ? "active" : ""}" id="favBtn">${
+          fav ? "取消收藏" : "收藏"
+        }</button>
+      </div>
+    </article>`;
+}
+
+function patchStudyChrome() {
+  const progress = document.getElementById("studyProgress");
+  if (progress && study) {
+    const t = sleepLabel();
+    progress.textContent = `${study.index + 1} / ${study.list.length}${
+      t ? ` · 睡觉 ${t}` : ""
+    }`;
+  }
+  const autoBtn = document.getElementById("autoBtn");
+  if (autoBtn && study) {
+    autoBtn.textContent = study.auto ? "暂停" : "自动播放";
+    autoBtn.classList.toggle("is-auto", !!study.auto);
   }
 }
 
-/** 内容区左右滑动 = 上一个 / 下一个（与底栏切题同一套逻辑） */
-function bindStudySwipe() {
-  const zone = document.getElementById("swipeZone");
-  if (!zone || zone.dataset.swipeBound === "1") return;
-  zone.dataset.swipeBound = "1";
+function armStudyProgressTicker() {
+  clearInterval(window.__sleepTick);
+  if (!(study?.auto && sleepDeadline)) return;
+  window.__sleepTick = setInterval(() => {
+    if (!study?.auto) return;
+    patchStudyChrome();
+  }, 1000);
+}
 
-  let startX = 0;
-  let startY = 0;
-  let tracking = false;
+/** 切题：优先只更新卡片区 + 简单翻页动画，避免整页重绘 */
+async function showStudyEntry({
+  direction = "next",
+  play = false,
+  autoAdvance = false,
+  animate = true,
+} = {}) {
+  if (!study?.list?.length) {
+    render();
+    return;
+  }
+  const stage = document.querySelector(".card-stage");
+  const oldCard = document.getElementById("studyCard");
 
-  const onStart = (x, y, target) => {
-    if (target?.closest?.("input, textarea, button, a, .mask")) {
-      tracking = false;
-      return;
-    }
-    startX = x;
-    startY = y;
-    tracking = true;
+  if (!stage || route.name !== "study") {
+    render();
+    if (play) playCurrent({ autoAdvance });
+    return;
+  }
+
+  const paint = () => {
+    stage.innerHTML = studyCardHtml(study.list[study.index]);
+    patchStudyChrome();
+    armStudyProgressTicker();
   };
 
-  const onEnd = (x, y) => {
-    if (!tracking) return;
-    tracking = false;
-    if (!study?.list?.length) return;
-    const dx = x - startX;
-    const dy = y - startY;
+  if (!animate || !oldCard || studyAnimating) {
+    paint();
+    if (play) playCurrent({ autoAdvance });
+    return;
+  }
+
+  studyAnimating = true;
+  const exitClass = direction === "prev" ? "card-exit-right" : "card-exit-left";
+  const enterClass = direction === "prev" ? "card-enter-left" : "card-enter-right";
+
+  oldCard.classList.add(exitClass);
+  await wait(170);
+  if (route.name !== "study" || !study?.list?.length) {
+    studyAnimating = false;
+    return;
+  }
+
+  paint();
+  const newCard = document.getElementById("studyCard");
+  if (newCard) {
+    newCard.classList.add(enterClass);
+    void newCard.offsetWidth;
+    newCard.classList.add("card-enter-active");
+    newCard.classList.remove(enterClass);
+    window.setTimeout(() => newCard.classList.remove("card-enter-active"), 220);
+  }
+  studyAnimating = false;
+
+  if (play) playCurrent({ autoAdvance });
+}
+
+/**
+ * 题号框以下、底栏以上整块滑动区：
+ * 位移很小 = 点击（交给原有 click）；位移够大 = 滑动切题。
+ */
+function setupStudySwipeOnce() {
+  if (window.__studySwipeReady) return;
+  window.__studySwipeReady = true;
+
+  const CLICK_SLOP = 14;
+  const SWIPE_MIN = 52;
+
+  const interactiveSel = "input, textarea, button, a, .mask, .action-row, .jump-row";
+
+  document.addEventListener(
+    "pointerdown",
+    (e) => {
+      if (route.name !== "study") return;
+      const zone = e.target.closest?.("#swipeZone");
+      if (!zone) return;
+      if (e.target.closest?.(interactiveSel)) {
+        swipeGesture = null;
+        return;
+      }
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      swipeGesture = {
+        id: e.pointerId,
+        x0: e.clientX,
+        y0: e.clientY,
+        maxDist: 0,
+      };
+    },
+    { passive: true },
+  );
+
+  document.addEventListener(
+    "pointermove",
+    (e) => {
+      if (!swipeGesture || e.pointerId !== swipeGesture.id) return;
+      const dx = e.clientX - swipeGesture.x0;
+      const dy = e.clientY - swipeGesture.y0;
+      swipeGesture.maxDist = Math.max(swipeGesture.maxDist, Math.hypot(dx, dy));
+    },
+    { passive: true },
+  );
+
+  const endGesture = (e) => {
+    if (!swipeGesture || e.pointerId !== swipeGesture.id) return;
+    const g = swipeGesture;
+    swipeGesture = null;
+    if (route.name !== "study" || studyAnimating || !study?.list?.length) return;
+
+    const dx = e.clientX - g.x0;
+    const dy = e.clientY - g.y0;
+    const dist = Math.max(g.maxDist, Math.hypot(dx, dy));
+
+    // 近似点击：不拦截，让 mask/空白区域的 click 正常发生
+    if (dist < CLICK_SLOP) return;
+    if (dist < SWIPE_MIN) return;
+
     const absX = Math.abs(dx);
     const absY = Math.abs(dy);
-    // 横向为主；也允许近似“上下一体”：明显纵向滑动同样切题
-    const horizontal = absX >= 56 && absX > absY * 0.85;
-    const vertical = absY >= 72 && absY > absX * 1.15;
+    const horizontal = absX >= absY * 0.9;
+    const vertical = absY > absX * 1.05;
     if (!horizontal && !vertical) return;
+
     unlockTTSFromGesture();
     if (horizontal) {
       if (dx < 0) moveNext({ fromAuto: false });
       else movePrev();
       return;
     }
-    // 上滑下一个、下滑上一个
     if (dy < 0) moveNext({ fromAuto: false });
     else movePrev();
   };
 
-  zone.addEventListener(
-    "touchstart",
-    (e) => {
-      const t = e.changedTouches?.[0];
-      if (!t) return;
-      onStart(t.clientX, t.clientY, e.target);
-    },
-    { passive: true },
-  );
-  zone.addEventListener(
-    "touchend",
-    (e) => {
-      const t = e.changedTouches?.[0];
-      if (!t) return;
-      onEnd(t.clientX, t.clientY);
-    },
-    { passive: true },
-  );
-
-  zone.addEventListener("pointerdown", (e) => {
-    if (e.pointerType === "touch") return;
-    if (e.button !== 0) return;
-    onStart(e.clientX, e.clientY, e.target);
-  });
-  zone.addEventListener("pointerup", (e) => {
-    if (e.pointerType === "touch") return;
-    onEnd(e.clientX, e.clientY);
-  });
+  document.addEventListener("pointerup", endGesture, { passive: true });
+  document.addEventListener("pointercancel", () => {
+    swipeGesture = null;
+  }, { passive: true });
 }
 
 function escapeAttr(s) {
@@ -979,7 +1085,7 @@ document.addEventListener("click", (e) => {
     const kind = unmask.getAttribute("data-unmask");
     if (kind === "meaning") study.revealMeaning = true;
     if (kind === "explain") study.revealExplain = true;
-    render();
+    unmask.remove();
     return;
   }
 
@@ -1160,4 +1266,5 @@ onVoicesChanged(() => {
 });
 
 ensureSyncedJaVoice();
+setupStudySwipeOnce();
 render();

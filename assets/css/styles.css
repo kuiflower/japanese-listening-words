@@ -237,6 +237,10 @@ a {
 }
 
 .study-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 100dvh;
   padding-bottom: calc(148px + var(--safe-bottom));
 }
 
@@ -302,7 +306,7 @@ a {
 }
 
 .card {
-  margin-top: 4px;
+  margin: 0;
   padding: 18px 14px 16px;
   border-radius: var(--radius);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 40%), var(--bg-elevated);
@@ -311,10 +315,54 @@ a {
   min-height: 0;
   width: 100%;
   max-width: 100%;
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   gap: 12px;
   overflow-x: hidden;
+  will-change: transform, opacity;
+  transition: transform 0.18s ease, opacity 0.18s ease;
+}
+
+.card.card-exit-left {
+  transform: translate3d(-34%, 0, 0);
+  opacity: 0;
+}
+
+.card.card-exit-right {
+  transform: translate3d(34%, 0, 0);
+  opacity: 0;
+}
+
+.card.card-enter-left {
+  transform: translate3d(-28%, 0, 0);
+  opacity: 0;
+  transition: none;
+}
+
+.card.card-enter-right {
+  transform: translate3d(28%, 0, 0);
+  opacity: 0;
+  transition: none;
+}
+
+.card.card-enter-active {
+  transform: translate3d(0, 0, 0);
+  opacity: 1;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .card.card-exit-left,
+  .card.card-exit-right,
+  .card.card-enter-left,
+  .card.card-enter-right,
+  .card.card-enter-active {
+    transition: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+  }
 }
 
 .meta-row {
@@ -394,21 +442,33 @@ a {
   color: var(--accent-strong);
 }
 
+/* 题号框以下、底栏以上：整块可滑区域 */
 .swipe-zone {
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
-  gap: 16px;
   min-width: 0;
+  min-height: 220px;
   touch-action: pan-y;
   user-select: none;
   -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
-.swipe-zone input,
-.swipe-zone button,
-.swipe-zone .mask {
+.swipe-zone .mask,
+.swipe-zone button {
   user-select: auto;
   -webkit-user-select: auto;
+}
+
+.card-stage {
+  flex: 1 1 auto;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-radius: var(--radius);
 }
 
 .action-row {
