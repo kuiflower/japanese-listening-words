@@ -5,7 +5,160 @@
       "title": "2026年7月 N2 真题听力单词",
       "level": "N2",
       "path": "2026-07-n2/words.json",
-      "metaPath": "2026-07-n2/meta.json"
+      "metaPath": "2026-07-n2/meta.json",
+      "count": 97
+    },
+    {
+      "id": "2025-12-n2",
+      "title": "2025年12月 N2 真题听力单词",
+      "level": "N2",
+      "path": "2025-12-n2/words.json",
+      "metaPath": "2025-12-n2/meta.json",
+      "count": 94
+    },
+    {
+      "id": "2025-07-n2",
+      "title": "2025年7月 N2 真题听力单词",
+      "level": "N2",
+      "path": "2025-07-n2/words.json",
+      "metaPath": "2025-07-n2/meta.json",
+      "count": 94
+    },
+    {
+      "id": "2024-12-n2",
+      "title": "2024年12月 N2 真题听力单词",
+      "level": "N2",
+      "path": "2024-12-n2/words.json",
+      "metaPath": "2024-12-n2/meta.json",
+      "count": 94
+    },
+    {
+      "id": "2024-07-n2",
+      "title": "2024年7月 N2 真题听力单词",
+      "level": "N2",
+      "path": "2024-07-n2/words.json",
+      "metaPath": "2024-07-n2/meta.json",
+      "count": 95
+    },
+    {
+      "id": "2023-12-n2",
+      "title": "2023年12月 N2 真题听力单词",
+      "level": "N2",
+      "path": "2023-12-n2/words.json",
+      "metaPath": "2023-12-n2/meta.json",
+      "count": 94
+    },
+    {
+      "id": "2023-07-n2",
+      "title": "2023年7月 N2 真题听力单词",
+      "level": "N2",
+      "path": "2023-07-n2/words.json",
+      "metaPath": "2023-07-n2/meta.json",
+      "count": 93
+    },
+    {
+      "id": "2022-12-n2",
+      "title": "2022年12月 N2 真题听力单词",
+      "level": "N2",
+      "path": "2022-12-n2/words.json",
+      "metaPath": "2022-12-n2/meta.json",
+      "count": 89
+    },
+    {
+      "id": "2022-07-n2",
+      "title": "2022年7月 N2 真题听力单词",
+      "level": "N2",
+      "path": "2022-07-n2/words.json",
+      "metaPath": "2022-07-n2/meta.json",
+      "count": 86
+    },
+    {
+      "id": "2021-12-n2",
+      "title": "2021年12月 N2 真题听力单词",
+      "level": "N2",
+      "path": "2021-12-n2/words.json",
+      "metaPath": "2021-12-n2/meta.json",
+      "count": 88
+    },
+    {
+      "id": "2021-07-n2",
+      "title": "2021年7月 N2 真题听力单词",
+      "level": "N2",
+      "path": "2021-07-n2/words.json",
+      "metaPath": "2021-07-n2/meta.json",
+      "count": 91
+    },
+    {
+      "id": "2020-12-n2",
+      "title": "2020年12月 N2 真题听力单词",
+      "level": "N2",
+      "path": "2020-12-n2/words.json",
+      "metaPath": "2020-12-n2/meta.json",
+      "count": 89
+    },
+    {
+      "id": "2019-12-n2",
+      "title": "2019年12月 N2 真题听力单词",
+      "level": "N2",
+      "path": "2019-12-n2/words.json",
+      "metaPath": "2019-12-n2/meta.json",
+      "count": 93
+    },
+    {
+      "id": "2019-07-n2",
+      "title": "2019年7月 N2 真题听力单词",
+      "level": "N2",
+      "path": "2019-07-n2/words.json",
+      "metaPath": "2019-07-n2/meta.json",
+      "count": 92
+    },
+    {
+      "id": "2018-12-n2",
+      "title": "2018年12月 N2 真题听力单词",
+      "level": "N2",
+      "path": "2018-12-n2/words.json",
+      "metaPath": "2018-12-n2/meta.json",
+      "count": 85
+    },
+    {
+      "id": "2018-07-n2",
+      "title": "2018年7月 N2 真题听力单词",
+      "level": "N2",
+      "path": "2018-07-n2/words.json",
+      "metaPath": "2018-07-n2/meta.json",
+      "count": 85
+    },
+    {
+      "id": "2017-12-n2",
+      "title": "2017年12月 N2 真题听力单词",
+      "level": "N2",
+      "path": "2017-12-n2/words.json",
+      "metaPath": "2017-12-n2/meta.json",
+      "count": 91
+    },
+    {
+      "id": "2017-07-n2",
+      "title": "2017年7月 N2 真题听力单词",
+      "level": "N2",
+      "path": "2017-07-n2/words.json",
+      "metaPath": "2017-07-n2/meta.json",
+      "count": 90
+    },
+    {
+      "id": "2016-12-n2",
+      "title": "2016年12月 N2 真题听力单词",
+      "level": "N2",
+      "path": "2016-12-n2/words.json",
+      "metaPath": "2016-12-n2/meta.json",
+      "count": 94
+    },
+    {
+      "id": "2016-07-n2",
+      "title": "2016年7月 N2 真题听力单词",
+      "level": "N2",
+      "path": "2016-07-n2/words.json",
+      "metaPath": "2016-07-n2/meta.json",
+      "count": 90
     }
   ],
   "allWordsDefinition": "所有已导入并完成抽取的词条合集（当前 = 上表各套合并）"

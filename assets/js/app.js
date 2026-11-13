@@ -5,8 +5,20 @@ import {
   saveFavorites,
   saveProgress,
   saveSettings,
-} from "./storage.js?v=3";
-import { pickVoices, prefetchEntry, speakEntry, stopSpeaking, wait, warmUpTTS } from "./tts.js?v=3";
+  } from "./storage.js?v=10";
+import {
+  listAllVoices,
+  listJaVoices,
+  onVoicesChanged,
+  pickVoices,
+  prefetchEntry,
+  previewJapaneseVoice,
+  speakEntry,
+  stopSpeaking,
+  unlockTTSFromGesture,
+  voiceShortLabel,
+  wait,
+} from "./tts.js?v=10";
 
 const root = document.getElementById("app");
 const data = window.APP_DATA || { sets: [] };
@@ -129,7 +141,8 @@ async function playCurrent({ autoAdvance = false } = {}) {
   abortPlay();
   playAbort = new AbortController();
   const { signal } = playAbort;
-  warmUpTTS();
+  // 保持手势标记：abort 后仍须在同一同步栈里尽快 speak（iOS）
+  unlockTTSFromGesture();
 
   // Auto loop: prefetch next word while current plays (reduces gap / stutter)
   while (!signal.aborted && token === study.playToken) {
@@ -474,19 +487,39 @@ function renderStudy() {
   }
 }
 
+function escapeAttr(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;");
+}
+
 function optionButtons(key, options, current, coerce = (v) => v) {
   return options
     .map((opt) => {
       const val = coerce(opt.value);
       const active = current === val ? "active" : "";
-      return `<button type="button" class="option ${active}" data-set="${key}" data-value="${opt.value}">${opt.label}</button>`;
+      return `<button type="button" class="option ${active}" data-set="${key}" data-value="${escapeAttr(opt.value)}">${escapeAttr(opt.label)}</button>`;
     })
     .join("");
 }
 
 function renderSettings() {
   const backHash = settingsBackHash();
-  const voices = pickVoices();
+  const voices = pickVoices(settings);
+  const jaList = listJaVoices();
+  const allCount = listAllVoices().length;
+  const jaOptions = [
+    { value: "", label: "自动择优" },
+    { value: "__system__", label: "跟随系统（冲优质 Otoya）" },
+    ...jaList.map((v) => ({
+      value: v.voiceURI || `${v.name}|${v.lang}`,
+      label: voiceShortLabel(v),
+    })),
+  ];
+  const hasOtoyaInList = jaList.some((v) =>
+    `${v.name} ${v.voiceURI || ""}`.toLowerCase().includes("otoya"),
+  );
   root.innerHTML = `
     <div class="shell">
       <div class="topbar">
@@ -496,10 +529,22 @@ function renderSettings() {
       </div>
       <div class="settings">
         <div class="setting-item">
-          <div class="head"><strong>当前音色</strong><span>系统可用中自动择优</span></div>
-          <div class="sub" style="color:var(--text-dim);font-size:0.85rem;line-height:1.45">
-            日文：${voices.jaName}<br/>中文：${voices.zhName}<br/>
-            提示：iPhone/Safari 或装了高品质语音包时通常更自然；Chrome 常优先 Google 日语。
+          <div class="head"><strong>日语音色</strong><span>当前：${voices.jaName}</span></div>
+          <div class="option-row">
+            ${optionButtons("jaVoiceURI", jaOptions, settings.jaVoiceURI || "")}
+          </div>
+          <div class="option-row" style="margin-top:4px">
+            <button type="button" class="option" id="refreshVoicesBtn">刷新音色列表</button>
+            <button type="button" class="option" id="previewVoiceBtn">试听当前音色</button>
+          </div>
+          <div class="sub" style="color:var(--text-dim);font-size:0.85rem;line-height:1.45;margin-top:10px">
+            浏览器检测到：全部 ${allCount} 个音色 / 日语 ${jaList.length} 个${
+              hasOtoyaInList ? "（列表里已有 Otoya）" : "（列表里没有 Otoya）"
+            }。<br/>
+            中文：${voices.zhName}<br/><br/>
+            <strong>Otoya（优质）为什么没有？</strong><br/>
+            这是 <strong>Apple / iPhone 网页限制</strong>：系统里下载的「优质 / 增强」音色，Safari（以及手机上的 Chrome）<strong>不会交给网页</strong>，本站无法把它单独列出来。<br/><br/>
+            可试：系统里把日语朗读声设为 Otoya（优质）→ 本站选 <strong>跟随系统（冲优质 Otoya）</strong> → 点试听。若仍是女声，说明网页只能用到普通档，优质档仅系统朗读/原生 App 可用。
           </div>
         </div>
         <div class="setting-item">
@@ -662,12 +707,33 @@ document.addEventListener("click", (e) => {
     if (key === "dictation" && study) resetReveal();
     if (key === "sleepMinutes" && study?.auto) armSleepTimer();
     if (key === "filterType") study = null;
+    if (key === "jaVoiceURI") {
+      unlockTTSFromGesture();
+      previewJapaneseVoice(settings);
+      showToast("已切换并试听");
+    } else {
+      showToast("已保存");
+    }
     render();
-    showToast("已保存");
+    return;
+  }
+
+  if (e.target.closest("#refreshVoicesBtn")) {
+    unlockTTSFromGesture();
+    window.speechSynthesis?.getVoices?.();
+    render();
+    showToast(`日语音色 ${listJaVoices().length} 个`);
+    return;
+  }
+  if (e.target.closest("#previewVoiceBtn")) {
+    unlockTTSFromGesture();
+    previewJapaneseVoice(settings);
+    showToast("试听中");
     return;
   }
 
   if (e.target.closest("#replayBtn")) {
+    unlockTTSFromGesture();
     playCurrent({ autoAdvance: !!study?.auto });
     return;
   }
@@ -676,14 +742,17 @@ document.addEventListener("click", (e) => {
     return;
   }
   if (e.target.closest("#prevBtn")) {
+    unlockTTSFromGesture();
     movePrev();
     return;
   }
   if (e.target.closest("#nextBtn")) {
+    unlockTTSFromGesture();
     moveNext({ fromAuto: false });
     return;
   }
   if (e.target.closest("#autoBtn")) {
+    unlockTTSFromGesture();
     toggleAuto();
     return;
   }
@@ -710,15 +779,19 @@ document.addEventListener("keydown", (e) => {
   if (tag === "INPUT" || tag === "TEXTAREA") return;
   if (e.key === "ArrowLeft") {
     e.preventDefault();
+    unlockTTSFromGesture();
     movePrev();
   } else if (e.key === "ArrowRight") {
     e.preventDefault();
+    unlockTTSFromGesture();
     moveNext({ fromAuto: false });
   } else if (e.key === " ") {
     e.preventDefault();
+    unlockTTSFromGesture();
     toggleAuto();
   } else if (e.key === "r" || e.key === "R") {
     e.preventDefault();
+    unlockTTSFromGesture();
     playCurrent({ autoAdvance: !!study.auto });
   } else if (e.key === "f" || e.key === "F") {
     e.preventDefault();
@@ -736,12 +809,16 @@ document.addEventListener(
   () => {
     try {
       window.speechSynthesis?.getVoices?.();
-      warmUpTTS();
+      unlockTTSFromGesture();
     } catch {
       /* ignore */
     }
   },
   { once: true },
 );
+
+onVoicesChanged(() => {
+  if (route.name === "settings") renderSettings();
+});
 
 render();

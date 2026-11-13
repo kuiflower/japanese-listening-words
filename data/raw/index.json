@@ -1,0 +1,182 @@
+[
+  {
+    "id": "2016-07-n2",
+    "sessionDir": "/Volumes/Work/日语学习/本当の問題/N2真题/2016/2016.07",
+    "sourcePdf": "/Volumes/Work/日语学习/本当の問題/N2真题/2016/2016.07/答案解析和听力原文/2016年07月N2听力原文.pdf",
+    "method": "vision-ocr",
+    "chars": 9612,
+    "pages": 7,
+    "sourceName": "2016年07月N2听力原文.pdf"
+  },
+  {
+    "id": "2016-12-n2",
+    "sessionDir": "/Volumes/Work/日语学习/本当の問題/N2真题/2016/2016.12",
+    "sourcePdf": "/Volumes/Work/日语学习/本当の問題/N2真题/2016/2016.12/答案解析和听力原文/2016年12月N2听力原文.pdf",
+    "method": "vision-ocr",
+    "chars": 9521,
+    "pages": 7,
+    "sourceName": "2016年12月N2听力原文.pdf"
+  },
+  {
+    "id": "2017-07-n2",
+    "sessionDir": "/Volumes/Work/日语学习/本当の問題/N2真题/2017/2017.07",
+    "sourcePdf": "/Volumes/Work/日语学习/本当の問題/N2真题/2017/2017.07/答案解析和听力原文/2017年07月N2听力原文.pdf",
+    "method": "vision-ocr",
+    "chars": 9527,
+    "pages": 7,
+    "sourceName": "2017年07月N2听力原文.pdf"
+  },
+  {
+    "id": "2017-12-n2",
+    "sessionDir": "/Volumes/Work/日语学习/本当の問題/N2真题/2017/2017.12",
+    "sourcePdf": "/Volumes/Work/日语学习/本当の問題/N2真题/2017/2017.12/答案解析和听力原文/2017年12月N2听力原文.pdf",
+    "method": "vision-ocr",
+    "chars": 9449,
+    "pages": 7,
+    "sourceName": "2017年12月N2听力原文.pdf"
+  },
+  {
+    "id": "2018-07-n2",
+    "sessionDir": "/Volumes/Work/日语学习/本当の問題/N2真题/2018/2018.07",
+    "sourcePdf": "/Volumes/Work/日语学习/本当の問題/N2真题/2018/2018.07/答案解析和听力原文/2018年07月N2听力原文.pdf",
+    "method": "vision-ocr",
+    "chars": 8784,
+    "pages": 6,
+    "sourceName": "2018年07月N2听力原文.pdf"
+  },
+  {
+    "id": "2018-12-n2",
+    "sessionDir": "/Volumes/Work/日语学习/本当の問題/N2真题/2018/2018.12",
+    "sourcePdf": "/Volumes/Work/日语学习/本当の問題/N2真题/2018/2018.12/答案解析和听力原文/2018年12月N2听力原文.pdf",
+    "method": "vision-ocr",
+    "chars": 9204,
+    "pages": 6,
+    "sourceName": "2018年12月N2听力原文.pdf"
+  },
+  {
+    "id": "2019-07-n2",
+    "sessionDir": "/Volumes/Work/日语学习/本当の問題/N2真题/2019/2019.07",
+    "sourcePdf": "/Volumes/Work/日语学习/本当の問題/N2真题/2019/2019.07/答案解析和听力原文/2019年07月N2听力原文.pdf",
+    "method": "vision-ocr",
+    "chars": 8766,
+    "pages": 6,
+    "sourceName": "2019年07月N2听力原文.pdf"
+  },
+  {
+    "id": "2019-12-n2",
+    "sessionDir": "/Volumes/Work/日语学习/本当の問題/N2真题/2019/2019.12",
+    "sourcePdf": "/Volumes/Work/日语学习/本当の問題/N2真题/2019/2019.12/答案解析和听力原文/2019年12月N2听力原文.pdf",
+    "method": "vision-ocr",
+    "chars": 8839,
+    "pages": 6,
+    "sourceName": "2019年12月N2听力原文.pdf"
+  },
+  {
+    "id": "2020-12-n2",
+    "sessionDir": "/Volumes/Work/日语学习/本当の問題/N2真题/2020/2020.12",
+    "sourcePdf": "/Volumes/Work/日语学习/本当の問題/N2真题/2020/2020.12/答案解析和听力原文/2020年12月N2听力原文.pdf",
+    "method": "vision-ocr",
+    "chars": 8390,
+    "pages": 6,
+    "sourceName": "2020年12月N2听力原文.pdf"
+  },
+  {
+    "id": "2021-07-n2",
+    "sessionDir": "/Volumes/Work/日语学习/本当の問題/N2真题/2021/2021.07",
+    "sourcePdf": "/Volumes/Work/日语学习/本当の問題/N2真题/2021/2021.07/答案解析和听力原文/2021年07月日语N2听力原文.pdf",
+    "method": "vision-ocr",
+    "chars": 7865,
+    "pages": 14,
+    "sourceName": "2021年07月日语N2听力原文.pdf"
+  },
+  {
+    "id": "2021-12-n2",
+    "sessionDir": "/Volumes/Work/日语学习/本当の問題/N2真题/2021/2021.12",
+    "sourcePdf": "/Volumes/Work/日语学习/本当の問題/N2真题/2021/2021.12/答案解析和听力原文/2021年12月日语N2听力原文.pdf",
+    "method": "vision-ocr",
+    "chars": 8675,
+    "pages": 15,
+    "sourceName": "2021年12月日语N2听力原文.pdf"
+  },
+  {
+    "id": "2022-07-n2",
+    "sessionDir": "/Volumes/Work/日语学习/本当の問題/N2真题/2022/2022.07",
+    "sourcePdf": "/Volumes/Work/日语学习/本当の問題/N2真题/2022/2022.07/答案解析和听力原文/2022年07月N2听力原文.pdf",
+    "method": "text-layer",
+    "chars": 8614,
+    "pages": 9,
+    "sourceName": "2022年07月N2听力原文.pdf"
+  },
+  {
+    "id": "2022-12-n2",
+    "sessionDir": "/Volumes/Work/日语学习/本当の問題/N2真题/2022/2022.12",
+    "sourcePdf": "/Volumes/Work/日语学习/本当の問題/N2真题/2022/2022.12/答案解析和听力原文/2022年12月N2听力原文.pdf",
+    "method": "vision-ocr",
+    "chars": 8419,
+    "pages": 6,
+    "sourceName": "2022年12月N2听力原文.pdf"
+  },
+  {
+    "id": "2023-07-n2",
+    "sessionDir": "/Volumes/Work/日语学习/本当の問題/N2真题/2023/2023.07",
+    "sourcePdf": "/Volumes/Work/日语学习/本当の問題/N2真题/2023/2023.07/答案解析和听力原文/2023年07月N2答案解析+听力原文+译文.pdf",
+    "method": "text-layer",
+    "chars": 31714,
+    "pages": 36,
+    "sourceName": "2023年07月N2答案解析+听力原文+译文.pdf"
+  },
+  {
+    "id": "2023-12-n2",
+    "sessionDir": "/Volumes/Work/日语学习/本当の問題/N2真题/2023/2023.12",
+    "sourcePdf": "/Volumes/Work/日语学习/本当の問題/N2真题/2023/2023.12/答案解析和听力原文/2023年12月N2听力原文.pdf",
+    "method": "vision-ocr",
+    "chars": 8407,
+    "pages": 10,
+    "sourceName": "2023年12月N2听力原文.pdf"
+  },
+  {
+    "id": "2024-07-n2",
+    "sessionDir": "/Volumes/Work/日语学习/本当の問題/N2真题/2024/2024.07",
+    "sourcePdf": "/Volumes/Work/日语学习/本当の問題/N2真题/2024/2024.07/答案解析和听力原文/2024年07月N2答案解析+听力原文.pdf",
+    "method": "text-layer",
+    "chars": 31480,
+    "pages": 35,
+    "sourceName": "2024年07月N2答案解析+听力原文.pdf"
+  },
+  {
+    "id": "2024-12-n2",
+    "sessionDir": "/Volumes/Work/日语学习/本当の問題/N2真题/2024/2024.12",
+    "sourcePdf": "/Volumes/Work/日语学习/本当の問題/N2真题/2024/2024.12/答案解析和听力原文/2024年12月N2听力原文.pdf",
+    "method": "text-layer",
+    "chars": 8623,
+    "pages": 13,
+    "sourceName": "2024年12月N2听力原文.pdf"
+  },
+  {
+    "id": "2025-07-n2",
+    "sessionDir": "/Volumes/Work/日语学习/本当の問題/N2真题/2025/2025.07",
+    "sourcePdf": "/Volumes/Work/日语学习/本当の問題/N2真题/2025/2025.07/答案解析和听力原文/2025年07月N2听力原文.pdf",
+    "method": "vision-ocr",
+    "chars": 8173,
+    "pages": 15,
+    "sourceName": "2025年07月N2听力原文.pdf"
+  },
+  {
+    "id": "2025-12-n2",
+    "sessionDir": "/Volumes/Work/日语学习/本当の問題/N2真题/2025/2025.12",
+    "sourcePdf": "/Volumes/Work/日语学习/本当の問題/N2真题/2025/2025.12/答案解析和听力原文/2025年12月N2听力原文.pdf",
+    "method": "text-layer",
+    "chars": 8448,
+    "pages": 13,
+    "sourceName": "2025年12月N2听力原文.pdf"
+  },
+  {
+    "id": "2026-07-n2",
+    "sessionDir": "/Volumes/Work/日语学习/本当の問題/N2真题/2026/2026.7",
+    "sourcePdf": "/Volumes/Work/日语学习/本当の問題/N2真题/2026/2026.7/2026年7月N2真题答案+解析+听力原文.pdf",
+    "method": "vision-ocr",
+    "chars": 21621,
+    "pages": 26,
+    "sourceName": "2026年7月N2真题答案+解析+听力原文.pdf"
+  }
+]

@@ -25,15 +25,20 @@ python3 -m http.server 5173
 
 ## 词库
 
-`data/sets/2026-07-n2/words.json`（当前 97 条）  
-打包进 `assets/js/bundle.js` 供前端使用。更新词库后重新生成：
+按真题套存放在 `data/sets/{年-月}-n2/`（`words.json` + `meta.json`）。  
+听力原文抽取文本在 `data/raw/`（扫描件经 macOS Vision OCR）。
+
+真题源目录（本机）：`/Volumes/Work/日语学习/本当の問題/N2真题`
+
+更新词库后重新打包：
 
 ```bash
-python3 -c "
-import json
-from pathlib import Path
-words=json.loads(Path('data/sets/2026-07-n2/words.json').read_text())
-meta=json.loads(Path('data/sets/2026-07-n2/meta.json').read_text())
-Path('assets/js/bundle.js').write_text('window.APP_DATA = '+json.dumps({'sets':[{**meta,'words':words}]},ensure_ascii=False)+';\n')
-"
+python3 scripts/validate_sets.py
+python3 scripts/build_bundle.py
+```
+
+重新抽取某套听力原文文本：
+
+```bash
+python3 scripts/extract_listening_text.py
 ```

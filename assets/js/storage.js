@@ -11,6 +11,7 @@ export const defaultSettings = {
   dictation: true,
   sleepMinutes: 0,
   filterType: "全部",
+  jaVoiceURI: "",
 };
 
 export function loadSettings() {

@@ -15,13 +15,24 @@
   --radius-sm: 12px;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-top: env(safe-area-inset-top, 0px);
+  --page-pad-x: 12px;
+  --dock-side: 8px;
   --font-ui: "Zen Kaku Gothic New", "IBM Plex Sans JP", system-ui, sans-serif;
   --font-jp: "IBM Plex Sans JP", "Zen Kaku Gothic New", "Hiragino Sans", sans-serif;
 }
 
-* {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
 }
 
 html,
@@ -40,6 +51,11 @@ body {
 
 body {
   min-height: 100dvh;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
+  position: relative;
 }
 
 button,
@@ -62,16 +78,21 @@ a {
 
 #app {
   min-height: 100dvh;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 .shell {
-  width: min(520px, 100%);
+  width: 100%;
+  max-width: 520px;
   margin: 0 auto;
   min-height: 100dvh;
-  padding: calc(16px + var(--safe-top)) 16px calc(24px + var(--safe-bottom));
+  padding: calc(12px + var(--safe-top)) var(--page-pad-x) calc(24px + var(--safe-bottom));
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
+  overflow-x: hidden;
 }
 
 .topbar {
@@ -79,12 +100,14 @@ a {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  min-width: 0;
 }
 
 .brand {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
 }
 
 .brand strong {
@@ -121,6 +144,7 @@ a {
 
 .hero-card {
   min-height: 108px;
+  min-width: 0;
   padding: 18px 16px;
   border-radius: var(--radius);
   background: linear-gradient(160deg, var(--bg-soft), var(--bg-elevated));
@@ -169,6 +193,7 @@ a {
 
 .list-item {
   width: 100%;
+  max-width: 100%;
   text-align: left;
   padding: 16px;
   border-radius: var(--radius-sm);
@@ -178,6 +203,7 @@ a {
   justify-content: space-between;
   align-items: center;
   gap: 12px;
+  min-width: 0;
 }
 
 .list-item:active {
@@ -186,6 +212,7 @@ a {
 
 .list-item .title {
   font-weight: 600;
+  word-break: break-word;
 }
 
 .list-item .sub {
@@ -197,6 +224,7 @@ a {
 .chip {
   display: inline-flex;
   align-items: center;
+  max-width: 100%;
   padding: 4px 10px;
   border-radius: 999px;
   background: var(--accent-soft);
@@ -204,27 +232,32 @@ a {
   font-size: 0.75rem;
   font-weight: 600;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .study-shell {
-  padding-bottom: calc(292px + var(--safe-bottom));
+  padding-bottom: calc(148px + var(--safe-bottom));
 }
 
 .study-header {
   display: grid;
-  grid-template-columns: 44px 1fr 44px;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
   align-items: center;
   gap: 8px;
+  width: 100%;
+  min-width: 0;
 }
 
 .study-header .center {
   text-align: center;
   min-width: 0;
+  overflow: hidden;
 }
 
 .study-header .center strong {
   display: block;
-  font-size: 0.95rem;
+  font-size: 0.92rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -237,11 +270,15 @@ a {
 
 .jump-row {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
+  width: 100%;
+  min-width: 0;
 }
 
 .jump-row input {
+  width: 100%;
+  min-width: 0;
   height: 44px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--line);
@@ -256,24 +293,28 @@ a {
 
 .jump-row button {
   height: 44px;
-  padding: 0 16px;
+  padding: 0 14px;
   border-radius: var(--radius-sm);
   background: var(--accent-soft);
   color: var(--accent-strong);
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .card {
   margin-top: 4px;
-  padding: 22px 18px 18px;
+  padding: 18px 14px 16px;
   border-radius: var(--radius);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 40%), var(--bg-elevated);
   border: 1px solid var(--line);
   box-shadow: var(--shadow);
-  min-height: 360px;
+  min-height: 0;
+  width: 100%;
+  max-width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
+  overflow-x: hidden;
 }
 
 .meta-row {
@@ -281,21 +322,24 @@ a {
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+  min-width: 0;
 }
 
 .word-main {
   font-family: var(--font-jp);
-  font-size: clamp(1.8rem, 7vw, 2.35rem);
+  font-size: clamp(1.55rem, 7.2vw, 2.35rem);
   font-weight: 700;
   line-height: 1.35;
   letter-spacing: 0.02em;
   word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .kana {
   font-family: var(--font-jp);
-  font-size: 1.15rem;
+  font-size: 1.1rem;
   color: var(--accent-strong);
+  word-break: break-word;
 }
 
 .meaning,
@@ -305,6 +349,7 @@ a {
   padding: 14px;
   background: var(--bg-soft);
   border: 1px solid var(--line);
+  min-width: 0;
 }
 
 .meaning .label,
@@ -318,11 +363,13 @@ a {
 .meaning .body {
   font-size: 1.12rem;
   font-weight: 600;
+  word-break: break-word;
 }
 
 .explain .body {
   color: var(--text);
   font-size: 0.95rem;
+  word-break: break-word;
 }
 
 .explain .source-ja {
@@ -352,6 +399,7 @@ a {
   grid-template-columns: 1.4fr 1fr;
   gap: 10px;
   margin-top: auto;
+  min-width: 0;
 }
 
 .btn {
@@ -360,6 +408,7 @@ a {
   font-weight: 600;
   border: 1px solid var(--line);
   background: var(--bg-soft);
+  min-width: 0;
 }
 
 .btn.primary {
@@ -374,30 +423,32 @@ a {
   border-color: rgba(212, 165, 116, 0.35);
 }
 
+/* 不用 left:50%+translateX，避免 iOS 把未变换前的盒子算进横向滚动 */
 .dock {
   position: fixed;
-  left: 50%;
-  transform: translateX(-50%);
+  left: var(--dock-side);
+  right: var(--dock-side);
   bottom: calc(8px + var(--safe-bottom));
-  width: min(520px, calc(100% - 16px));
+  width: auto;
+  max-width: 520px;
+  margin: 0 auto;
   display: grid;
-  grid-template-columns: 1fr;
-  grid-template-rows: 1fr 1fr 1fr;
-  gap: 10px;
-  padding: 12px;
-  border-radius: 28px;
-  background: rgba(12, 17, 24, 0.92);
+  grid-template-columns: 1fr 1.15fr 1fr;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 22px;
+  background: rgba(12, 17, 24, 0.94);
   border: 1px solid var(--line);
   backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   z-index: 20;
-  /* Tall stack for eyes-free tapping */
-  height: min(276px, 42dvh);
+  box-sizing: border-box;
 }
 
 .dock-btn {
-  min-height: 72px;
-  height: 100%;
-  border-radius: 22px;
+  min-height: 108px;
+  min-width: 0;
+  border-radius: 16px;
   background: var(--bg-elevated);
   border: 1px solid var(--line);
   display: flex;
@@ -405,17 +456,20 @@ a {
   align-items: center;
   justify-content: center;
   gap: 4px;
-  font-size: 0.85rem;
+  font-size: 0.72rem;
   color: var(--text-dim);
   touch-action: manipulation;
   user-select: none;
+  -webkit-user-select: none;
+  padding: 12px 2px;
 }
 
 .dock-btn strong {
-  font-size: 1.2rem;
+  font-size: 1.05rem;
   color: var(--text);
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
 }
 
 .dock-btn.main {
@@ -425,7 +479,7 @@ a {
 
 .dock-btn.main strong {
   color: var(--accent-strong);
-  font-size: 1.28rem;
+  font-size: 1.1rem;
 }
 
 .dock-btn:active {
@@ -454,6 +508,7 @@ a {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  min-width: 0;
 }
 
 .setting-item {
@@ -464,6 +519,7 @@ a {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  min-width: 0;
 }
 
 .setting-item .head {
@@ -471,11 +527,14 @@ a {
   justify-content: space-between;
   gap: 12px;
   align-items: baseline;
+  min-width: 0;
 }
 
 .setting-item .head span {
   color: var(--text-dim);
   font-size: 0.82rem;
+  text-align: right;
+  word-break: break-word;
 }
 
 .option-row {
@@ -492,6 +551,7 @@ a {
   background: var(--bg-soft);
   color: var(--text-dim);
   font-size: 0.88rem;
+  max-width: 100%;
 }
 
 .option.active {
@@ -503,9 +563,12 @@ a {
 
 .toast {
   position: fixed;
-  left: 50%;
-  transform: translateX(-50%) translateY(20px);
-  bottom: calc(100px + var(--safe-bottom));
+  left: 16px;
+  right: 16px;
+  bottom: calc(148px + var(--safe-bottom));
+  width: auto;
+  max-width: 420px;
+  margin: 0 auto;
   background: rgba(20, 27, 37, 0.96);
   border: 1px solid var(--line);
   color: var(--text);
@@ -513,16 +576,16 @@ a {
   border-radius: 999px;
   opacity: 0;
   pointer-events: none;
+  transform: translateY(12px);
   transition: opacity 0.2s ease, transform 0.2s ease;
   z-index: 40;
   font-size: 0.9rem;
-  max-width: min(90vw, 420px);
   text-align: center;
 }
 
 .toast.show {
   opacity: 1;
-  transform: translateX(-50%) translateY(0);
+  transform: translateY(0);
 }
 
 .timer-pill {
@@ -536,6 +599,28 @@ a {
   font-size: 0.78rem;
 }
 
+@media (min-width: 480px) {
+  :root {
+    --page-pad-x: 16px;
+  }
+
+  .dock-btn {
+    min-height: 118px;
+  }
+
+  .dock-btn strong {
+    font-size: 1.12rem;
+  }
+
+  .study-shell {
+    padding-bottom: calc(160px + var(--safe-bottom));
+  }
+
+  .toast {
+    bottom: calc(160px + var(--safe-bottom));
+  }
+}
+
 @media (min-width: 720px) {
   .shell {
     padding-top: 28px;
@@ -543,5 +628,13 @@ a {
 
   .card {
     min-height: 420px;
+    padding: 22px 18px 18px;
+  }
+
+  .dock {
+    left: 50%;
+    right: auto;
+    width: 520px;
+    margin-left: -260px;
   }
 }
