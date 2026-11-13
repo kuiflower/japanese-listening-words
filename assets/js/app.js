@@ -7,8 +7,9 @@ import {
   saveFavorites,
   saveProgress,
   saveSettings,
-} from "./storage.js?v=16";
+} from "./storage.js?v=17";
 import {
+  findVoiceByFamily,
   getDefaultJaVoice,
   getMissingJaRecommendations,
   listAllVoices,
@@ -25,7 +26,7 @@ import {
   voiceSettingsPathHint,
   voiceShortLabel,
   wait,
-} from "./tts.js?v=16";
+} from "./tts.js?v=17";
 
 const root = document.getElementById("app");
 const data = window.APP_DATA || { sets: [] };
@@ -923,16 +924,34 @@ document.addEventListener("click", (e) => {
 
   const hintBtn = e.target.closest("[data-voice-hint]");
   if (hintBtn) {
+    const id = hintBtn.getAttribute("data-voice-hint") || "";
+    unlockTTSFromGesture();
+    window.speechSynthesis?.getVoices?.();
+    const found = findVoiceByFamily(id);
+    if (found) {
+      settings = { ...settings, jaVoiceURI: voiceKey(found) };
+      saveSettings(settings);
+      previewJapaneseVoice(settings);
+      showToast(`已识别到 ${voiceShortLabel(found)}，已切换`);
+      render();
+      return;
+    }
     const { platform } = detectClient();
-    showToast(`未下载。请去系统安装后点刷新：${voiceSettingsPathHint(platform)}`, 4200);
+    showToast(
+      `网页仍未识别到该音色。请确认已下载后点刷新。路径：${voiceSettingsPathHint(platform)}`,
+      4200,
+    );
     return;
   }
 
   if (e.target.closest("#refreshVoicesBtn")) {
     unlockTTSFromGesture();
     window.speechSynthesis?.getVoices?.();
+    ensureSyncedJaVoice();
     render();
-    showToast(`日语音色 ${listJaVoices().length} 个`);
+    const ja = listJaVoices();
+    const names = ja.map((v) => voiceShortLabel(v)).join("、") || "无";
+    showToast(`日语 ${ja.length} 个：${names}`, 2800);
     return;
   }
   if (e.target.closest("#previewVoiceBtn")) {

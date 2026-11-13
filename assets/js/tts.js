@@ -82,13 +82,37 @@ function voiceBlob(v) {
   return `${v.name || ""} ${v.voiceURI || ""} ${v.lang || ""}`.toLowerCase();
 }
 
+/** 统一连字符/空白，避免 Apple「O‑Ren」(特殊横线) 匹配失败 */
+function normVoiceText(s) {
+  return String(s || "")
+    .toLowerCase()
+    .replace(/[\u2010-\u2015\u2212\uFE58\uFE63\uFF0D\-_.\s]/g, "");
+}
+
+function isKnownAppleJaName(v) {
+  const n = normVoiceText(`${v.name || ""}${v.voiceURI || ""}`);
+  return (
+    n.includes("kyoko") ||
+    n.includes("otoya") ||
+    n.includes("oren") || // O-Ren / O‑Ren / Oren
+    n.includes("mitsuko") ||
+    (n.includes("siri") && (n.includes("jajp") || n.includes("japan")))
+  );
+}
+
 function isNoveltyVoice(v) {
-  const n = voiceBlob(v);
-  if (n.includes("eloquence") || n.includes("espeak") || n.includes("novelty")) return true;
+  // 正经日语声绝不进新奇过滤
+  if (isKnownAppleJaName(v) && !/eloquence|novelty|eddy|flo|grandma|grandpa|rocko|sandy|shelley|hattori/i.test(voiceBlob(v))) {
+    const n = normVoiceText(`${v.name || ""}${v.voiceURI || ""}`);
+    if (n.includes("kyoko") || n.includes("otoya") || n.includes("oren")) return false;
+  }
+  const raw = voiceBlob(v);
+  if (raw.includes("eloquence") || raw.includes("espeak") || raw.includes("novelty")) return true;
   // Apple 角色声常见 URI：com.apple.voice.compact.ja-JP.Eddy 等
-  if (/\/(eddy|flo|grandma|grandpa|reed|rocko|sandy|shelley|hattori)\b/i.test(n)) return true;
+  if (/[./](eddy|flo|grandma|grandpa|reed|rocko|sandy|shelley|hattori)([./]|$)/i.test(raw)) return true;
   const name = String(v.name || "")
     .toLowerCase()
+    .replace(/[\u2010-\u2015\u2212\uFE58\uFE63\uFF0D\-]/g, "-")
     .replace(/\s*\(.*?\)\s*/g, " ")
     .trim();
   return NOVELTY_JA_NAMES.some((bad) => name === bad || name.startsWith(`${bad} `));
@@ -96,29 +120,33 @@ function isNoveltyVoice(v) {
 
 function isJapaneseVoice(v) {
   if (isNoveltyVoice(v)) return false;
+  if (isKnownAppleJaName(v)) return true;
   const lang = String(v.lang || "")
     .toLowerCase()
     .replace(/_/g, "-");
   if (lang.startsWith("ja")) return true;
   const n = voiceBlob(v);
+  const compact = normVoiceText(n);
   return (
     n.includes("ja-jp") ||
+    compact.includes("jajp") ||
     n.includes("japan") ||
     n.includes("日本語") ||
-    n.includes("kyoko") ||
-    n.includes("otoya") ||
-    n.includes("o-ren") ||
-    n.includes("oren") ||
-    n.includes("nanami") ||
-    n.includes("haruka") ||
+    compact.includes("kyoko") ||
+    compact.includes("otoya") ||
+    compact.includes("oren") ||
+    compact.includes("nanami") ||
+    compact.includes("haruka") ||
     n.includes("google 日本語") ||
-    n.includes("google日本語")
+    n.includes("google日本語") ||
+    (n.includes("google") && lang.startsWith("ja"))
   );
 }
 
 function scoreJa(v) {
   if (!isJapaneseVoice(v)) return -1;
   const n = voiceBlob(v);
+  const compact = normVoiceText(n);
   let s = 80;
 
   // compact 仍列出，只是自动择优时靠后
@@ -130,12 +158,12 @@ function scoreJa(v) {
 
   if (n.includes("google")) s += 55;
 
-  if (n.includes("microsoft") && (n.includes("nanami") || n.includes("keita") || n.includes("ayumi"))) s += 52;
-  if (n.includes("microsoft") && n.includes("haruka")) s += 40;
+  if (n.includes("microsoft") && (compact.includes("nanami") || compact.includes("keita") || compact.includes("ayumi"))) s += 52;
+  if (n.includes("microsoft") && compact.includes("haruka")) s += 40;
 
-  if (n.includes("kyoko")) s += 48;
-  if (n.includes("o-ren") || n.includes("oren")) s += 36;
-  if (n.includes("otoya")) s += 28;
+  if (compact.includes("kyoko")) s += 48;
+  if (compact.includes("oren")) s += 36;
+  if (compact.includes("otoya")) s += 28;
   if (n.includes("siri")) s += 24;
 
   if (v.localService === false) s += 8;
@@ -165,28 +193,55 @@ export function listAllVoices() {
 
 /** 同一人名只保留音质最好的一条，避免 Kyoko 出现两次 */
 function voiceFamilyKey(v) {
-  const n = voiceBlob(v);
+  const n = normVoiceText(`${v.name || ""}${v.voiceURI || ""}${v.lang || ""}`);
   if (n.includes("otoya")) return "otoya";
   if (n.includes("kyoko")) return "kyoko";
-  if (n.includes("o-ren") || /\boren\b/.test(n)) return "oren";
+  if (n.includes("oren")) return "oren";
   if (n.includes("nanami")) return "nanami";
   if (n.includes("keita")) return "keita";
   if (n.includes("haruka")) return "haruka";
-  if (n.includes("google") && (n.includes("日本語") || n.includes("japan") || (v.lang || "").toLowerCase().startsWith("ja"))) {
+  const lang = String(v.lang || "").toLowerCase();
+  if (n.includes("google") && (n.includes("日本語") || n.includes("japan") || n.includes("jajp") || lang.startsWith("ja"))) {
     return "google-ja";
   }
   return v.voiceURI || `${v.name}|${v.lang}`;
 }
 
+/** 在全部音色里按族名查找（含特殊连字符、lang 异常等情况） */
+export function findVoiceByFamily(family) {
+  const all = refreshVoices();
+  const matchFamily = (v) => {
+    const n = normVoiceText(`${v.name || ""}${v.voiceURI || ""}`);
+    if (family === "oren") return n.includes("oren");
+    if (family === "otoya") return n.includes("otoya");
+    if (family === "kyoko") return n.includes("kyoko");
+    if (family === "google-ja") {
+      return n.includes("google") && (n.includes("japan") || n.includes("日本語") || n.includes("jajp") || String(v.lang || "").toLowerCase().startsWith("ja"));
+    }
+    if (family === "nanami") return n.includes("nanami");
+    return voiceFamilyKey(v) === family;
+  };
+  const scored = all.filter((v) => !isNoveltyVoice(v) && matchFamily(v));
+  if (!scored.length) return null;
+  scored.sort((a, b) => scoreJa(b) - scoreJa(a));
+  return scored[0];
+}
+
 export function listJaVoices() {
   const best = new Map();
-  refreshVoices()
-    .filter((v) => scoreJa(v) >= 0)
-    .forEach((v) => {
-      const key = voiceFamilyKey(v);
-      const prev = best.get(key);
-      if (!prev || scoreJa(v) > scoreJa(prev)) best.set(key, v);
-    });
+  const consider = (v, force = false) => {
+    if (!v) return;
+    if (!force && scoreJa(v) < 0) return;
+    const key = voiceFamilyKey(v);
+    const prev = best.get(key);
+    const score = Math.max(scoreJa(v), force ? 1 : -1);
+    if (!prev || score > scoreJa(prev)) best.set(key, v);
+  };
+  refreshVoices().forEach((v) => consider(v, false));
+  // 再捞一次已知日语声，防止特殊连字符/lang 异常被漏掉
+  for (const family of ["kyoko", "otoya", "oren", "google-ja", "nanami", "keita", "haruka"]) {
+    consider(findVoiceByFamily(family), true);
+  }
   return [...best.values()].sort((a, b) => scoreJa(b) - scoreJa(a));
 }
 
@@ -216,11 +271,10 @@ export function findJaVoiceByURI(want) {
 }
 
 /**
- * 只返回「本机尚未出现在 getVoices 里」的推荐项。
- * 一旦检测到同族音色，不再展示硬编码推荐，改由真实名称按钮显示。
+ * 只返回「本机 getVoices 里确实找不到」的推荐项。
+ * 会先宽松扫描全部音色；找到则不算未下载（由 listJaVoices 出真实按钮）。
  */
 export function getMissingJaRecommendations(platform = "other") {
-  const present = new Set(listJaVoices().map((v) => voiceFamilyKey(v)));
   const catalog =
     platform === "apple"
       ? [
@@ -234,7 +288,7 @@ export function getMissingJaRecommendations(platform = "other") {
           ]
         : [];
   return catalog
-    .filter((item) => !present.has(item.family))
+    .filter((item) => !findVoiceByFamily(item.family))
     .map((item) => ({ ...item, status: "missing" }));
 }
 
