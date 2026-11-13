@@ -5,7 +5,7 @@ import {
   saveFavorites,
   saveProgress,
   saveSettings,
-  } from "./storage.js?v=10";
+  } from "./storage.js?v=11";
 import {
   listAllVoices,
   listJaVoices,
@@ -18,7 +18,7 @@ import {
   unlockTTSFromGesture,
   voiceShortLabel,
   wait,
-} from "./tts.js?v=10";
+} from "./tts.js?v=11";
 
 const root = document.getElementById("app");
 const data = window.APP_DATA || { sets: [] };
@@ -33,6 +33,10 @@ let toastTimer = null;
 let sleepTimerId = null;
 let sleepDeadline = 0;
 let playAbort = null;
+/** 自动播放时申请屏幕常亮，减少手机黑屏后 TTS/定时器被系统挂起 */
+let wakeLock = null;
+let wakeLockWanted = false;
+let keepAliveVideo = null;
 
 function parseHash() {
   const raw = location.hash.replace(/^#/, "") || "/";
@@ -91,6 +95,7 @@ function armSleepTimer() {
     if (study?.auto) {
       study.auto = false;
       abortPlay();
+      releaseWakeLock();
       render();
       showToast("睡觉模式：已自动停止播放");
     }
@@ -122,10 +127,88 @@ function abortPlay() {
   stopSpeaking();
 }
 
+async function requestWakeLock() {
+  wakeLockWanted = true;
+  try {
+    if (navigator.wakeLock?.request) {
+      wakeLock = await navigator.wakeLock.request("screen");
+      wakeLock.addEventListener("release", () => {
+        // 系统可能自行释放；若仍在自动播放则稍后重申
+        if (wakeLockWanted && study?.auto && document.visibilityState === "visible") {
+          setTimeout(() => {
+            if (wakeLockWanted && study?.auto) requestWakeLock();
+          }, 800);
+        }
+      });
+      return true;
+    }
+  } catch {
+    /* 无权限 / 非 HTTPS 等 */
+  }
+  startKeepAliveFallback();
+  return false;
+}
+
+function releaseWakeLock() {
+  wakeLockWanted = false;
+  try {
+    wakeLock?.release?.();
+  } catch {
+    /* ignore */
+  }
+  wakeLock = null;
+  stopKeepAliveFallback();
+}
+
+/** 无 Wake Lock 时：静音 canvas 视频流，部分安卓可延缓息屏（iOS 仍依赖系统锁屏设置） */
+function startKeepAliveFallback() {
+  if (keepAliveVideo) return;
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = 2;
+    canvas.height = 2;
+    const ctx = canvas.getContext("2d");
+    if (ctx) {
+      ctx.fillStyle = "#0c1118";
+      ctx.fillRect(0, 0, 2, 2);
+    }
+    const stream = canvas.captureStream?.(1);
+    if (!stream) return;
+    const v = document.createElement("video");
+    v.setAttribute("playsinline", "");
+    v.setAttribute("webkit-playsinline", "");
+    v.muted = true;
+    v.playsInline = true;
+    v.srcObject = stream;
+    v.style.cssText =
+      "position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;left:-9px;bottom:0;z-index:-1;";
+    document.body.appendChild(v);
+    keepAliveVideo = v;
+    v.play().catch(() => {});
+  } catch {
+    /* ignore */
+  }
+}
+
+function stopKeepAliveFallback() {
+  if (!keepAliveVideo) return;
+  try {
+    const stream = keepAliveVideo.srcObject;
+    stream?.getTracks?.().forEach((t) => t.stop());
+    keepAliveVideo.pause();
+    keepAliveVideo.srcObject = null;
+    keepAliveVideo.remove();
+  } catch {
+    /* ignore */
+  }
+  keepAliveVideo = null;
+}
+
 function leaveStudyPlayback() {
   abortPlay();
   if (study) study.auto = false;
   clearSleepTimer();
+  releaseWakeLock();
 }
 
 function nextIndexFrom(index) {
@@ -161,6 +244,7 @@ async function playCurrent({ autoAdvance = false } = {}) {
     if (nIdx == null) {
       study.auto = false;
       clearSleepTimer();
+      releaseWakeLock();
       showToast("已到列表末尾");
       render();
       return;
@@ -206,6 +290,7 @@ function moveNext({ fromAuto = false } = {}) {
   if (nIdx == null) {
     study.auto = false;
     clearSleepTimer();
+    releaseWakeLock();
     showToast("已到列表末尾");
     render();
     return;
@@ -222,11 +307,13 @@ function toggleAuto() {
   study.auto = !study.auto;
   if (study.auto) {
     armSleepTimer();
+    requestWakeLock();
     render();
     playCurrent({ autoAdvance: true });
   } else {
     clearSleepTimer();
     abortPlay();
+    releaseWakeLock();
     render();
     showToast("已切换为手动模式");
   }
@@ -637,6 +724,12 @@ function renderSettings() {
           </div>
         </div>
         <div class="setting-item">
+          <div class="head"><strong>自动连播与熄屏</strong></div>
+          <div class="sub" style="color:var(--text-dim);font-size:0.85rem;line-height:1.45">
+            开启「自动播放」时会尽量申请屏幕常亮（需 HTTPS，如 GitHub Pages）。若仍黑屏，请到手机系统里把「自动锁定」调长，或把本站「添加到主屏幕」后打开。息屏后系统可能挂起网页，亮屏回来会尝试自动续播。
+          </div>
+        </div>
+        <div class="setting-item">
           <div class="head"><strong>定时关闭（睡觉模式）</strong></div>
           <div class="option-row">
             ${optionButtons(
@@ -802,6 +895,20 @@ document.addEventListener("keydown", (e) => {
 window.addEventListener("hashchange", () => {
   leaveStudyPlayback();
   render();
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState !== "visible") return;
+  if (!study?.auto || route.name !== "study") return;
+  requestWakeLock();
+  // 息屏后 speechSynthesis / 定时器常被挂起，亮屏后若未在播则续播
+  const synth = window.speechSynthesis;
+  const speaking = !!(synth && (synth.speaking || synth.pending));
+  if (!speaking) {
+    unlockTTSFromGesture();
+    playCurrent({ autoAdvance: true });
+    showToast("已从熄屏恢复连播");
+  }
 });
 
 document.addEventListener(
