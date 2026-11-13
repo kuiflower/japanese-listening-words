@@ -2,6 +2,10 @@
 
 仅黑夜模式的词条听练站：读音 + 中文意思强化，不是做题站。
 
+## 在线访问
+
+https://kuiflower.github.io/japanese-listening-words/
+
 ## 本地打开
 
 因使用 ES Module，请用本地静态服务打开（不要直接双击 `index.html`）：
