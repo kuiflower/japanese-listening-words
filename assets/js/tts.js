@@ -45,12 +45,62 @@ if (typeof window !== "undefined" && window.speechSynthesis) {
   }, 250);
 }
 
+/** Apple 多语种「角色/新奇」声：会挂 ja-JP，但听起来像卡通，不适合练听力 */
+const NOVELTY_JA_NAMES = [
+  "eddy",
+  "flo",
+  "grandma",
+  "grandpa",
+  "reed",
+  "rocko",
+  "sandy",
+  "shelley",
+  "hattori",
+  "jacques",
+  "jester",
+  "organ",
+  "superstar",
+  "trinoids",
+  "whisper",
+  "zarvox",
+  "albert",
+  "bad news",
+  "bahh",
+  "bells",
+  "boing",
+  "bubbles",
+  "cellos",
+  "deranged",
+  "good news",
+  "hysterical",
+  "junior",
+  "kathy",
+  "pipe organ",
+];
+
+function voiceBlob(v) {
+  return `${v.name || ""} ${v.voiceURI || ""} ${v.lang || ""}`.toLowerCase();
+}
+
+function isNoveltyVoice(v) {
+  const n = voiceBlob(v);
+  if (n.includes("eloquence") || n.includes("espeak") || n.includes("novelty")) return true;
+  // Apple 角色声常见 URI：com.apple.voice.compact.ja-JP.Eddy 等
+  if (/\/(eddy|flo|grandma|grandpa|reed|rocko|sandy|shelley|hattori)\b/i.test(n)) return true;
+  const name = String(v.name || "")
+    .toLowerCase()
+    .replace(/\s*\(.*?\)\s*/g, " ")
+    .trim();
+  return NOVELTY_JA_NAMES.some((bad) => name === bad || name.startsWith(`${bad} `));
+}
+
 function isJapaneseVoice(v) {
+  if (isNoveltyVoice(v)) return false;
   const lang = String(v.lang || "")
     .toLowerCase()
     .replace(/_/g, "-");
   if (lang.startsWith("ja")) return true;
-  const n = `${v.name || ""} ${v.voiceURI || ""}`.toLowerCase();
+  const n = voiceBlob(v);
   return (
     n.includes("ja-jp") ||
     n.includes("japan") ||
@@ -68,10 +118,9 @@ function isJapaneseVoice(v) {
 
 function scoreJa(v) {
   if (!isJapaneseVoice(v)) return -1;
-  const n = `${v.name} ${v.lang} ${v.voiceURI || ""}`.toLowerCase();
+  const n = voiceBlob(v);
   let s = 80;
 
-  if (n.includes("eloquence") || n.includes("espeak") || n.includes("novelty")) s -= 60;
   // compact 仍列出，只是自动择优时靠后
   if (n.includes("compact")) s -= 25;
 
@@ -114,36 +163,133 @@ export function listAllVoices() {
   return refreshVoices();
 }
 
-export function listJaVoices() {
-  const seen = new Set();
-  return refreshVoices()
-    .filter((v) => scoreJa(v) >= 0)
-    .sort((a, b) => scoreJa(b) - scoreJa(a))
-    .filter((v) => {
-      const key = v.voiceURI || `${v.name}|${v.lang}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
+/** 同一人名只保留音质最好的一条，避免 Kyoko 出现两次 */
+function voiceFamilyKey(v) {
+  const n = voiceBlob(v);
+  if (n.includes("otoya")) return "otoya";
+  if (n.includes("kyoko")) return "kyoko";
+  if (n.includes("o-ren") || /\boren\b/.test(n)) return "oren";
+  if (n.includes("nanami")) return "nanami";
+  if (n.includes("keita")) return "keita";
+  if (n.includes("haruka")) return "haruka";
+  if (n.includes("google") && (n.includes("日本語") || n.includes("japan") || (v.lang || "").toLowerCase().startsWith("ja"))) {
+    return "google-ja";
+  }
+  return v.voiceURI || `${v.name}|${v.lang}`;
 }
 
+export function listJaVoices() {
+  const best = new Map();
+  refreshVoices()
+    .filter((v) => scoreJa(v) >= 0)
+    .forEach((v) => {
+      const key = voiceFamilyKey(v);
+      const prev = best.get(key);
+      if (!prev || scoreJa(v) > scoreJa(prev)) best.set(key, v);
+    });
+  return [...best.values()].sort((a, b) => scoreJa(b) - scoreJa(a));
+}
+
+export function voiceKey(v) {
+  if (!v) return "";
+  return v.voiceURI || `${v.name}|${v.lang}`;
+}
+
+/** 当前设备「日语默认声」：优先 voice.default，否则按音质排序第一 */
+export function getDefaultJaVoice() {
+  const ja = listJaVoices();
+  if (!ja.length) return null;
+  const byFlag = ja.find((v) => v.default);
+  if (byFlag) return byFlag;
+  const globalDefault = refreshVoices().find((v) => v.default && scoreJa(v) >= 0);
+  if (globalDefault) return globalDefault;
+  return ja[0];
+}
+
+export function findJaVoiceByURI(want) {
+  if (!want || want === "__system__") return null;
+  return (
+    listJaVoices().find(
+      (v) => voiceKey(v) === want || v.name === want || `${v.name}|${v.lang}` === want,
+    ) || null
+  );
+}
+
+/**
+ * 只返回「本机尚未出现在 getVoices 里」的推荐项。
+ * 一旦检测到同族音色，不再展示硬编码推荐，改由真实名称按钮显示。
+ */
+export function getMissingJaRecommendations(platform = "other") {
+  const present = new Set(listJaVoices().map((v) => voiceFamilyKey(v)));
+  const catalog =
+    platform === "apple"
+      ? [
+          { id: "otoya", family: "otoya", label: "Otoya" },
+          { id: "oren", family: "oren", label: "O-Ren" },
+        ]
+      : platform === "android"
+        ? [
+            { id: "google-ja", family: "google-ja", label: "Google 日本語" },
+            { id: "nanami", family: "nanami", label: "Nanami" },
+          ]
+        : [];
+  return catalog
+    .filter((item) => !present.has(item.family))
+    .map((item) => ({ ...item, status: "missing" }));
+}
+
+/** 网页无法跳进系统设置，只返回手动路径 */
+export function voiceSettingsPathHint(platform = "other") {
+  if (platform === "apple") {
+    return "设置 → 辅助功能 → 朗读内容 → 声音 → 日语";
+  }
+  if (platform === "android") {
+    return "设置 → 系统 → 语言和输入法 → 文字转语音 → Google 文字转语音 → 安装日语";
+  }
+  return "请在系统设置中安装日语语音包";
+}
+
+/** 按钮文案：尽量用系统返回的原始名称 */
 export function voiceShortLabel(v) {
-  if (!v) return "系统默认";
-  let name = v.name
-    .replace(/^Google\s+/i, "")
-    .replace(/^Microsoft\s+/i, "")
+  if (!v) return "未选择";
+  let name = String(v.name || "").trim();
+  if (!name) return voiceKey(v) || "未命名";
+  // 去掉过长括号说明，但保留系统自带的质量词
+  name = name
     .replace(/\s*Online\s*\(Natural\)/i, " Neural")
-    .replace(/\s*\(.*?\)$/, "")
+    .replace(/\s*\((compact|premium|enhanced|标准|增强|优质)\)\s*$/i, (_, t) => {
+      const map = { compact: "标准", premium: "Premium", enhanced: "增强" };
+      const key = String(t).toLowerCase();
+      return ` · ${map[key] || t}`;
+    })
     .trim();
-  const tags = [];
-  const low = `${v.name} ${v.voiceURI || ""}`.toLowerCase();
-  if (low.includes("premium") || low.includes(".premium")) tags.push("Premium");
-  else if (low.includes("enhanced") || low.includes(".enhanced")) tags.push("增强");
-  else if (low.includes("neural") || low.includes("natural")) tags.push("Neural");
-  else if (low.includes("compact") || low.includes(".compact")) tags.push("标准");
-  else if (low.includes("google")) tags.push("在线");
-  if (v.localService === false && !tags.includes("在线")) tags.push("在线");
-  return tags.length ? `${name} · ${tags[0]}` : name;
+  const low = voiceBlob(v);
+  if (!/·/.test(name)) {
+    if (low.includes(".premium") || /\bpremium\b/.test(low)) name += " · Premium";
+    else if (low.includes(".enhanced") || /\benhanced\b/.test(low)) name += " · 增强";
+    else if (low.includes(".compact") || /\bcompact\b/.test(low)) name += " · 标准";
+  }
+  return name;
+}
+
+/**
+ * 校正设置里的 jaVoiceURI：去掉旧的「跟随系统/自动」占位，对齐本机真实音色。
+ * 返回是否改写了 settings。
+ */
+export function syncJaVoiceSetting(settings = {}) {
+  const jaList = listJaVoices();
+  if (!jaList.length) return { settings, changed: false, voice: null };
+
+  const want = settings.jaVoiceURI;
+  let found = findJaVoiceByURI(want);
+  if (!found) found = getDefaultJaVoice();
+  const nextURI = voiceKey(found);
+  if (want === nextURI) return { settings, changed: false, voice: found };
+  return {
+    settings: { ...settings, jaVoiceURI: nextURI },
+    changed: true,
+    voice: found,
+  };
 }
 
 /** 设置页试听当前音色 */
@@ -164,30 +310,11 @@ export function pickVoices(settings = {}) {
     .filter((v) => scoreZh(v) >= 0)
     .sort((a, b) => scoreZh(b) - scoreZh(a));
 
-  const want = settings.jaVoiceURI;
-  let ja = null;
-  let jaName = "系统默认日语";
-
-  // iPhone：优质/增强 Otoya 往往不出现在 getVoices() 里。
-  // 不指定 voice、只设 lang，有机会走到系统「朗读内容」里选中的日语声。
-  if (want === "__system__") {
-    ja = null;
-    jaName = "跟随系统（不指定）";
-  } else if (want) {
-    const found = jaList.find(
-      (v) => v.voiceURI === want || `${v.name}|${v.lang}` === want || v.name === want,
-    );
-    ja = found || jaList[0] || null;
-    jaName = voiceShortLabel(ja) || "系统默认日语";
-  } else {
-    ja = jaList[0] || null;
-    jaName = voiceShortLabel(ja) || "自动择优";
-  }
-
+  const ja = findJaVoiceByURI(settings.jaVoiceURI) || getDefaultJaVoice();
   return {
     ja,
     zh: zhList[0] || null,
-    jaName,
+    jaName: voiceShortLabel(ja) || "未检测到日语声",
     zhName: voiceShortLabel(zhList[0]) || "系统默认中文",
     jaList,
   };

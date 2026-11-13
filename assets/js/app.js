@@ -1,12 +1,16 @@
 import {
+  dismissVoiceTip,
+  isVoiceTipDismissed,
   loadFavorites,
   loadProgress,
   loadSettings,
   saveFavorites,
   saveProgress,
   saveSettings,
-  } from "./storage.js?v=11";
+} from "./storage.js?v=16";
 import {
+  getDefaultJaVoice,
+  getMissingJaRecommendations,
   listAllVoices,
   listJaVoices,
   onVoicesChanged,
@@ -15,10 +19,13 @@ import {
   previewJapaneseVoice,
   speakEntry,
   stopSpeaking,
+  syncJaVoiceSetting,
   unlockTTSFromGesture,
+  voiceKey,
+  voiceSettingsPathHint,
   voiceShortLabel,
   wait,
-} from "./tts.js?v=11";
+} from "./tts.js?v=16";
 
 const root = document.getElementById("app");
 const data = window.APP_DATA || { sets: [] };
@@ -67,7 +74,115 @@ function filterWords(list) {
   return list.filter((w) => w.type === settings.filterType);
 }
 
-function showToast(msg) {
+function detectClient() {
+  const ua = navigator.userAgent || "";
+  const isApple =
+    /iPhone|iPad|iPod/i.test(ua) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const isAndroid = /Android/i.test(ua);
+  const platform = isApple ? "apple" : isAndroid ? "android" : "other";
+  return { isApple, isAndroid, isMobile: isApple || isAndroid, platform };
+}
+
+function ensureSyncedJaVoice() {
+  const { settings: next, changed } = syncJaVoiceSetting(settings);
+  if (changed) {
+    settings = next;
+    saveSettings(settings);
+  }
+  return changed;
+}
+
+function voiceOptionButtonsHtml() {
+  const { platform } = detectClient();
+  const jaList = listJaVoices();
+  const current = settings.jaVoiceURI || voiceKey(getDefaultJaVoice());
+  const defaultKey = voiceKey(getDefaultJaVoice());
+
+  const chips = jaList.map((v) => {
+    const value = voiceKey(v);
+    const isDefault = value === defaultKey;
+    return {
+      kind: "pick",
+      value,
+      label: isDefault ? `${voiceShortLabel(v)} · 系统默认` : voiceShortLabel(v),
+      active: current === value,
+    };
+  });
+
+  for (const item of getMissingJaRecommendations(platform)) {
+    chips.push({
+      kind: "hint",
+      status: "missing",
+      id: item.id,
+      label: `${item.label} · 未下载`,
+    });
+  }
+
+  if (!chips.length) {
+    return `<span class="sub" style="color:var(--text-dim);font-size:0.85rem">未检测到日语音色，请先按下方路径下载后点「刷新」</span>`;
+  }
+
+  return chips
+    .map((chip) => {
+      if (chip.kind === "pick") {
+        return `<button type="button" class="option ${chip.active ? "active" : ""}" data-set="jaVoiceURI" data-value="${escapeAttr(chip.value)}">${escapeAttr(chip.label)}</button>`;
+      }
+      return `<button type="button" class="option voice-hint missing" data-voice-hint="${escapeAttr(chip.id)}">${escapeAttr(chip.label)}</button>`;
+    })
+    .join("");
+}
+
+function voiceDownloadGuideHtml() {
+  const { isApple, isAndroid } = detectClient();
+  if (isApple) {
+    return `
+      <div class="voice-guide">
+        <strong>iPhone / iPad 下载日语声</strong>
+        <ol>
+          <li><strong>设置 → 辅助功能 → 朗读内容 → 声音 → 日语</strong></li>
+          <li>下载想要的音色（如 Otoya 优质 / 增强，带云图标）</li>
+          <li>设为日语默认后回到本站，点 <strong>刷新音色列表</strong></li>
+        </ol>
+      </div>`;
+  }
+  if (isAndroid) {
+    return `
+      <div class="voice-guide">
+        <strong>Android 下载日语声</strong>
+        <ol>
+          <li><strong>设置 → 系统 → 语言和输入法 → 文字转语音输出</strong>（部分机型在「辅助功能」）</li>
+          <li>引擎选 <strong>Google 文字转语音</strong> → 安装语音数据 → <strong>日语</strong></li>
+          <li>回到本站点 <strong>刷新音色列表</strong></li>
+        </ol>
+      </div>`;
+  }
+  return `
+    <div class="voice-guide">
+      <strong>电脑端</strong>：Chrome / Edge + 系统日语语音包；手机请用 Safari（iPhone）或 Chrome（Android）。
+    </div>`;
+}
+
+function homeVoiceTipHtml() {
+  if (isVoiceTipDismissed()) return "";
+  const { isApple, isAndroid } = detectClient();
+  const tip = isApple
+    ? "音质取决于系统已下载的日语声。可到「设置 → 辅助功能 → 朗读内容 → 声音 → 日语」下载后，回本站点刷新。"
+    : isAndroid
+      ? "请安装 Google 文字转语音的日语包，再到本站「设置」刷新音色。"
+      : "手机练习时请先在系统下载日语朗读声，再到设置里刷新选择。";
+  return `
+    <div class="voice-tip" id="voiceTip">
+      <div class="tip-title">想听更好听的日语？</div>
+      <div class="tip-body">${tip}</div>
+      <div class="tip-actions">
+        <button type="button" class="option active" data-go="#/settings/home">去设置看步骤</button>
+        <button type="button" class="option" id="dismissVoiceTipBtn">知道了</button>
+      </div>
+    </div>`;
+}
+
+function showToast(msg, ms = 1800) {
   let el = document.querySelector(".toast");
   if (!el) {
     el = document.createElement("div");
@@ -77,7 +192,7 @@ function showToast(msg) {
   el.textContent = msg;
   el.classList.add("show");
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove("show"), 1800);
+  toastTimer = setTimeout(() => el.classList.remove("show"), ms);
 }
 
 function clearSleepTimer() {
@@ -451,6 +566,7 @@ function renderHome() {
         </div>
         <button class="icon-btn" data-go="#/settings/home" aria-label="设置">${iconGear()}</button>
       </div>
+      ${homeVoiceTipHtml()}
       <div class="hero-actions">
         <button class="hero-card" data-go="#/study/favorites">
           <div class="label">收藏单词</div>
@@ -593,20 +709,11 @@ function optionButtons(key, options, current, coerce = (v) => v) {
 
 function renderSettings() {
   const backHash = settingsBackHash();
-  const voices = pickVoices(settings);
+  ensureSyncedJaVoice();
   const jaList = listJaVoices();
+  const voices = pickVoices(settings);
   const allCount = listAllVoices().length;
-  const jaOptions = [
-    { value: "", label: "自动择优" },
-    { value: "__system__", label: "跟随系统（冲优质 Otoya）" },
-    ...jaList.map((v) => ({
-      value: v.voiceURI || `${v.name}|${v.lang}`,
-      label: voiceShortLabel(v),
-    })),
-  ];
-  const hasOtoyaInList = jaList.some((v) =>
-    `${v.name} ${v.voiceURI || ""}`.toLowerCase().includes("otoya"),
-  );
+  const defaultVoice = getDefaultJaVoice();
   root.innerHTML = `
     <div class="shell">
       <div class="topbar">
@@ -618,20 +725,17 @@ function renderSettings() {
         <div class="setting-item">
           <div class="head"><strong>日语音色</strong><span>当前：${voices.jaName}</span></div>
           <div class="option-row">
-            ${optionButtons("jaVoiceURI", jaOptions, settings.jaVoiceURI || "")}
+            ${voiceOptionButtonsHtml()}
           </div>
           <div class="option-row" style="margin-top:4px">
             <button type="button" class="option" id="refreshVoicesBtn">刷新音色列表</button>
             <button type="button" class="option" id="previewVoiceBtn">试听当前音色</button>
           </div>
-          <div class="sub" style="color:var(--text-dim);font-size:0.85rem;line-height:1.45;margin-top:10px">
-            浏览器检测到：全部 ${allCount} 个音色 / 日语 ${jaList.length} 个${
-              hasOtoyaInList ? "（列表里已有 Otoya）" : "（列表里没有 Otoya）"
-            }。<br/>
-            中文：${voices.zhName}<br/><br/>
-            <strong>Otoya（优质）为什么没有？</strong><br/>
-            这是 <strong>Apple / iPhone 网页限制</strong>：系统里下载的「优质 / 增强」音色，Safari（以及手机上的 Chrome）<strong>不会交给网页</strong>，本站无法把它单独列出来。<br/><br/>
-            可试：系统里把日语朗读声设为 Otoya（优质）→ 本站选 <strong>跟随系统（冲优质 Otoya）</strong> → 点试听。若仍是女声，说明网页只能用到普通档，优质档仅系统朗读/原生 App 可用。
+          <div style="margin-top:10px">${voiceDownloadGuideHtml()}</div>
+          <div class="sub" style="color:var(--text-dim);font-size:0.82rem;line-height:1.45;margin-top:10px">
+            本机日语 ${jaList.length} 个（系统默认：${
+              defaultVoice ? voiceShortLabel(defaultVoice) : "无"
+            }）· 全部音色 ${allCount} · 中文：${voices.zhName}
           </div>
         </div>
         <div class="setting-item">
@@ -811,6 +915,19 @@ document.addEventListener("click", (e) => {
     return;
   }
 
+  if (e.target.closest("#dismissVoiceTipBtn")) {
+    dismissVoiceTip();
+    render();
+    return;
+  }
+
+  const hintBtn = e.target.closest("[data-voice-hint]");
+  if (hintBtn) {
+    const { platform } = detectClient();
+    showToast(`未下载。请去系统安装后点刷新：${voiceSettingsPathHint(platform)}`, 4200);
+    return;
+  }
+
   if (e.target.closest("#refreshVoicesBtn")) {
     unlockTTSFromGesture();
     window.speechSynthesis?.getVoices?.();
@@ -925,7 +1042,9 @@ document.addEventListener(
 );
 
 onVoicesChanged(() => {
+  ensureSyncedJaVoice();
   if (route.name === "settings") renderSettings();
 });
 
+ensureSyncedJaVoice();
 render();

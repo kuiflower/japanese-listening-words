@@ -504,6 +504,67 @@ a {
   justify-content: center;
 }
 
+.voice-tip {
+  margin: 0 0 14px;
+  padding: 14px 16px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(145deg, rgba(212, 165, 116, 0.14), rgba(125, 190, 154, 0.08));
+  border: 1px solid rgba(212, 165, 116, 0.28);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.voice-tip .tip-title {
+  font-weight: 650;
+  font-size: 0.95rem;
+  color: var(--accent-strong);
+}
+
+.voice-tip .tip-body {
+  color: var(--text-dim);
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.voice-tip .tip-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.voice-tip .tip-actions .option {
+  min-height: 36px;
+  padding: 6px 12px;
+  font-size: 0.82rem;
+}
+
+.option.voice-hint.missing {
+  border-style: dashed;
+  border-color: rgba(220, 120, 120, 0.45);
+  color: #e8a0a0;
+  background: rgba(220, 120, 120, 0.08);
+}
+
+.voice-guide {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  line-height: 1.55;
+}
+
+.voice-guide ol {
+  margin: 8px 0 0;
+  padding-left: 1.2em;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.voice-guide strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
 .settings {
   display: flex;
   flex-direction: column;
@@ -573,14 +634,15 @@ a {
   border: 1px solid var(--line);
   color: var(--text);
   padding: 10px 16px;
-  border-radius: 999px;
+  border-radius: 16px;
   opacity: 0;
   pointer-events: none;
   transform: translateY(12px);
   transition: opacity 0.2s ease, transform 0.2s ease;
   z-index: 40;
-  font-size: 0.9rem;
+  font-size: 0.86rem;
   text-align: center;
+  line-height: 1.4;
 }
 
 .toast.show {

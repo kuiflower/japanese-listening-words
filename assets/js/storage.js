@@ -1,6 +1,7 @@
 const SETTINGS_KEY = "jlw.settings.v2";
 const FAVORITES_KEY = "jlw.favorites.v1";
 const PROGRESS_KEY = "jlw.progress.v1";
+const VOICE_TIP_KEY = "jlw.voiceTip.dismissed.v1";
 
 export const defaultSettings = {
   intervalMs: 500,
@@ -49,4 +50,12 @@ export function loadProgress() {
 
 export function saveProgress(map) {
   localStorage.setItem(PROGRESS_KEY, JSON.stringify(map));
+}
+
+export function isVoiceTipDismissed() {
+  return localStorage.getItem(VOICE_TIP_KEY) === "1";
+}
+
+export function dismissVoiceTip() {
+  localStorage.setItem(VOICE_TIP_KEY, "1");
 }
