@@ -257,29 +257,14 @@ export function findZhVoiceByURI(want) {
 }
 
 export function syncZhVoiceSetting(settings = {}) {
-  const want = settings.zhVoiceURI;
-  if (want === "__system__") {
+  // 中文固定系统默认：网页列不出彬彬等高质量声，指定列表声会播错
+  if (settings.zhVoiceURI === "__system__") {
     return { settings, changed: false, voice: null };
   }
-  const zhList = listZhVoices();
-  if (!zhList.length) {
-    if (want !== "__system__") {
-      return {
-        settings: { ...settings, zhVoiceURI: "__system__" },
-        changed: true,
-        voice: null,
-      };
-    }
-    return { settings, changed: false, voice: null };
-  }
-  let found = findZhVoiceByURI(want);
-  if (!found) found = getDefaultZhVoice();
-  const nextURI = voiceKey(found);
-  if (want === nextURI) return { settings, changed: false, voice: found };
   return {
-    settings: { ...settings, zhVoiceURI: nextURI },
+    settings: { ...settings, zhVoiceURI: "__system__" },
     changed: true,
-    voice: found,
+    voice: null,
   };
 }
 

@@ -246,37 +246,11 @@ a {
 
 .study-header {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) auto;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
   align-items: center;
   gap: 8px;
   width: 100%;
   min-width: 0;
-}
-
-.study-header .header-right {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  justify-self: end;
-}
-
-.header-auto-btn {
-  height: 36px;
-  padding: 0 12px;
-  border-radius: 999px;
-  border: 1px solid rgba(212, 165, 116, 0.4);
-  background: linear-gradient(180deg, rgba(212, 165, 116, 0.22), rgba(212, 165, 116, 0.08));
-  color: var(--accent-strong);
-  font-size: 0.78rem;
-  font-weight: 700;
-  white-space: nowrap;
-  touch-action: manipulation;
-}
-
-.header-auto-btn.is-auto {
-  background: linear-gradient(180deg, rgba(125, 190, 154, 0.28), rgba(125, 190, 154, 0.1));
-  border-color: rgba(125, 190, 154, 0.45);
-  color: var(--ok);
 }
 
 .study-header .center {
@@ -332,6 +306,7 @@ a {
 }
 
 .card {
+  position: relative;
   margin: 0;
   padding: 18px 14px 16px;
   border-radius: var(--radius);
@@ -348,6 +323,34 @@ a {
   overflow-x: hidden;
   will-change: transform, opacity;
   transition: transform 0.18s ease, opacity 0.18s ease;
+}
+
+.card-auto-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 3;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(212, 165, 116, 0.45);
+  background: linear-gradient(180deg, rgba(212, 165, 116, 0.28), rgba(212, 165, 116, 0.1));
+  color: var(--accent-strong);
+  font-size: 0.76rem;
+  font-weight: 700;
+  white-space: nowrap;
+  touch-action: manipulation;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.22);
+}
+
+.card-auto-btn.is-auto {
+  background: linear-gradient(180deg, rgba(125, 190, 154, 0.32), rgba(125, 190, 154, 0.12));
+  border-color: rgba(125, 190, 154, 0.5);
+  color: var(--ok);
+}
+
+.card .meta-row {
+  padding-right: 92px;
 }
 
 .card.card-exit-left {
