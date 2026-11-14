@@ -170,21 +170,141 @@ function scoreJa(v) {
   return s;
 }
 
+function isChineseVoice(v) {
+  const lang = String(v.lang || "")
+    .toLowerCase()
+    .replace(/_/g, "-");
+  if (lang.startsWith("zh") || lang.includes("cmn")) return true;
+  const n = voiceBlob(v);
+  return (
+    n.includes("zh-cn") ||
+    n.includes("zh-tw") ||
+    n.includes("zh-hk") ||
+    n.includes("chinese") ||
+    n.includes("中文") ||
+    n.includes("普通话") ||
+    n.includes("国语") ||
+    n.includes("tingting") ||
+    n.includes("meijia") ||
+    n.includes("sinji") ||
+    n.includes("xiaoxiao") ||
+    n.includes("yunxi")
+  );
+}
+
 function scoreZh(v) {
-  const n = `${v.name} ${v.lang}`.toLowerCase();
-  const lang = v.lang.toLowerCase();
-  let s = 0;
-  if (!lang.startsWith("zh") && !lang.includes("cmn")) return -1;
-  s += 80;
-  if (n.includes("neural") || n.includes("natural")) s += 45;
-  if (n.includes("enhanced") || n.includes("premium")) s += 40;
-  if (n.includes("google")) s += 38;
-  if (lang.includes("zh-cn") || lang.includes("cmn-cn") || n.includes("china")) s += 25;
-  if (n.includes("xiaoxiao") || n.includes("yunxi") || n.includes("yaoyao")) s += 30;
-  if (n.includes("tingting") || n.includes("meijia") || n.includes("sinji")) s += 22;
+  if (!isChineseVoice(v)) return -1;
+  const n = voiceBlob(v);
+  const lang = String(v.lang || "")
+    .toLowerCase()
+    .replace(/_/g, "-");
+  let s = 80;
+  if (n.includes("compact") || n.includes("eloquence")) s -= 20;
+  if (n.includes("neural") || n.includes("natural") || n.includes("online (natural)")) s += 50;
+  if (n.includes("enhanced") || n.includes("premium")) s += 42;
+  if (n.includes("google")) s += 40;
+  if (lang.includes("zh-cn") || lang.includes("cmn-cn") || n.includes("china") || n.includes("简体")) s += 28;
+  if (n.includes("xiaoxiao") || n.includes("yunxi") || n.includes("yaoyao") || n.includes("xiaoyi")) s += 32;
+  if (n.includes("tingting") || n.includes("meijia") || n.includes("sinji")) s += 24;
   if (n.includes("siri")) s += 18;
-  if (n.includes("compact") || n.includes("eloquence")) s -= 15;
+  if (v.localService === false) s += 8;
+  if (v.default) s += 12;
   return s;
+}
+
+function zhVoiceFamilyKey(v) {
+  const n = normVoiceText(`${v.name || ""}${v.voiceURI || ""}${v.lang || ""}`);
+  if (n.includes("tingting")) return "tingting";
+  if (n.includes("meijia")) return "meijia";
+  if (n.includes("sinji")) return "sinji";
+  if (n.includes("xiaoxiao")) return "xiaoxiao";
+  if (n.includes("yunxi")) return "yunxi";
+  if (n.includes("yaoyao")) return "yaoyao";
+  if (n.includes("google") && (n.includes("chinese") || n.includes("中文") || n.includes("zhcn") || n.includes("cmn"))) {
+    return "google-zh";
+  }
+  return v.voiceURI || `${v.name}|${v.lang}`;
+}
+
+export function listZhVoices() {
+  const best = new Map();
+  refreshVoices().forEach((v) => {
+    if (scoreZh(v) < 0) return;
+    const key = zhVoiceFamilyKey(v);
+    const prev = best.get(key);
+    if (!prev || scoreZh(v) > scoreZh(prev)) best.set(key, v);
+  });
+  return [...best.values()].sort((a, b) => scoreZh(b) - scoreZh(a));
+}
+
+export function getDefaultZhVoice() {
+  const zh = listZhVoices();
+  if (!zh.length) return null;
+  const byFlag = zh.find((v) => v.default);
+  if (byFlag) return byFlag;
+  const globalDefault = refreshVoices().find((v) => v.default && scoreZh(v) >= 0);
+  if (globalDefault) return globalDefault;
+  return zh[0];
+}
+
+export function findZhVoiceByURI(want) {
+  if (!want || want === "__system__") return null;
+  return (
+    listZhVoices().find(
+      (v) => voiceKey(v) === want || v.name === want || `${v.name}|${v.lang}` === want,
+    ) || null
+  );
+}
+
+export function syncZhVoiceSetting(settings = {}) {
+  const want = settings.zhVoiceURI;
+  if (want === "__system__") {
+    return { settings, changed: false, voice: null };
+  }
+  const zhList = listZhVoices();
+  if (!zhList.length) {
+    if (want !== "__system__") {
+      return {
+        settings: { ...settings, zhVoiceURI: "__system__" },
+        changed: true,
+        voice: null,
+      };
+    }
+    return { settings, changed: false, voice: null };
+  }
+  let found = findZhVoiceByURI(want);
+  if (!found) found = getDefaultZhVoice();
+  const nextURI = voiceKey(found);
+  if (want === nextURI) return { settings, changed: false, voice: found };
+  return {
+    settings: { ...settings, zhVoiceURI: nextURI },
+    changed: true,
+    voice: found,
+  };
+}
+
+export function previewChineseVoice(settings = {}) {
+  if (!window.speechSynthesis) return;
+  unlockTTSFromGesture();
+  stopSpeaking();
+  unlockTTSFromGesture();
+  const { zh } = pickVoices(settings);
+  const u = makeUtterance("观光旺季", { lang: "zh-CN", voice: zh, rate: 1 });
+  gestureSpeak = true;
+  speakUtterance(u);
+}
+
+/** 播一段中文（意思/解释），用于意思框点播 */
+export function speakChineseText(text, settings = {}) {
+  if (!window.speechSynthesis || !text) return;
+  unlockTTSFromGesture();
+  stopSpeaking();
+  unlockTTSFromGesture();
+  const { zh } = pickVoices(settings);
+  const rate = Number(settings.rate) || 1;
+  const u = makeUtterance(String(text), { lang: "zh-CN", voice: zh, rate });
+  gestureSpeak = true;
+  speakUtterance(u);
 }
 
 export function listAllVoices() {
@@ -370,9 +490,7 @@ export function previewJapaneseVoice(settings = {}) {
 
 export function pickVoices(settings = {}) {
   const jaList = listJaVoices();
-  const zhList = refreshVoices()
-    .filter((v) => scoreZh(v) >= 0)
-    .sort((a, b) => scoreZh(b) - scoreZh(a));
+  const zhList = listZhVoices();
 
   let ja = null;
   let jaName = "未检测到日语声";
@@ -385,12 +503,23 @@ export function pickVoices(settings = {}) {
     jaName = voiceShortLabel(ja) || "未检测到日语声";
   }
 
+  let zh = null;
+  let zhName = "未检测到中文声";
+  if (settings.zhVoiceURI === "__system__" || !settings.zhVoiceURI) {
+    zh = null;
+    zhName = "系统中文默认";
+  } else {
+    zh = findZhVoiceByURI(settings.zhVoiceURI) || getDefaultZhVoice();
+    zhName = voiceShortLabel(zh) || "未检测到中文声";
+  }
+
   return {
     ja,
-    zh: zhList[0] || null,
+    zh,
     jaName,
-    zhName: voiceShortLabel(zhList[0]) || "系统默认中文",
+    zhName,
     jaList,
+    zhList,
   };
 }
 

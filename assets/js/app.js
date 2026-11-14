@@ -7,26 +7,31 @@ import {
   saveFavorites,
   saveProgress,
   saveSettings,
-} from "./storage.js?v=21";
+} from "./storage.js?v=22";
 import {
   findVoiceByFamily,
   getDefaultJaVoice,
+  getDefaultZhVoice,
   getMissingJaRecommendations,
   listAllVoices,
   listJaVoices,
+  listZhVoices,
   onVoicesChanged,
   pickVoices,
   prefetchEntry,
+  previewChineseVoice,
   previewJapaneseVoice,
+  speakChineseText,
   speakEntry,
   stopSpeaking,
   syncJaVoiceSetting,
+  syncZhVoiceSetting,
   unlockTTSFromGesture,
   voiceKey,
   voiceSettingsPathHint,
   voiceShortLabel,
   wait,
-} from "./tts.js?v=21";
+} from "./tts.js?v=22";
 
 const root = document.getElementById("app");
 const data = window.APP_DATA || { sets: [] };
@@ -97,6 +102,15 @@ function ensureSyncedJaVoice() {
   return changed;
 }
 
+function ensureSyncedZhVoice() {
+  const { settings: next, changed } = syncZhVoiceSetting(settings);
+  if (changed) {
+    settings = next;
+    saveSettings(settings);
+  }
+  return changed;
+}
+
 function voiceOptionButtonsHtml() {
   const { platform, isApple } = detectClient();
   const jaList = listJaVoices();
@@ -147,6 +161,86 @@ function voiceOptionButtonsHtml() {
       return `<button type="button" class="option voice-hint missing" data-voice-hint="${escapeAttr(chip.id)}">${escapeAttr(chip.label)}</button>`;
     })
     .join("");
+}
+
+/** 中文音色按钮：文案逻辑与日语一致（系统默认 / 列表默认） */
+function zhVoiceOptionButtonsHtml() {
+  const { isApple } = detectClient();
+  const zhList = listZhVoices();
+  const current = settings.zhVoiceURI || (isApple ? "__system__" : voiceKey(getDefaultZhVoice()));
+  const listedKey = voiceKey(getDefaultZhVoice());
+
+  const chips = [];
+  chips.push({
+    value: "__system__",
+    label: "系统中文默认",
+    active: current === "__system__",
+  });
+
+  for (const v of zhList) {
+    const value = voiceKey(v);
+    chips.push({
+      value,
+      label:
+        value === listedKey && current !== "__system__"
+          ? `${voiceShortLabel(v)} · 列表默认`
+          : voiceShortLabel(v),
+      active: current === value,
+    });
+  }
+
+  if (chips.length <= 1 && !zhList.length) {
+    return `<span class="sub" style="color:var(--text-dim);font-size:0.85rem">未检测到中文音色，可先用「系统中文默认」；或到系统下载中文朗读声后点刷新</span>`;
+  }
+
+  return chips
+    .map(
+      (chip) =>
+        `<button type="button" class="option ${chip.active ? "active" : ""}" data-set="zhVoiceURI" data-value="${escapeAttr(chip.value)}">${escapeAttr(chip.label)}</button>`,
+    )
+    .join("");
+}
+
+let uiAudioCtx = null;
+function getUiAudioCtx() {
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return null;
+  if (!uiAudioCtx) uiAudioCtx = new AC();
+  if (uiAudioCtx.state === "suspended") uiAudioCtx.resume();
+  return uiAudioCtx;
+}
+
+/** 轻柔收藏/取消音效（正弦短鸣，不刺耳） */
+function playFavoriteSfx(isAdd) {
+  try {
+    const ctx = getUiAudioCtx();
+    if (!ctx) return;
+    const t0 = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    if (isAdd) {
+      osc.frequency.setValueAtTime(523.25, t0);
+      osc.frequency.exponentialRampToValueAtTime(784.0, t0 + 0.1);
+      gain.gain.setValueAtTime(0.0001, t0);
+      gain.gain.exponentialRampToValueAtTime(0.06, t0 + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.28);
+      osc.start(t0);
+      osc.stop(t0 + 0.3);
+    } else {
+      osc.frequency.setValueAtTime(440.0, t0);
+      osc.frequency.exponentialRampToValueAtTime(277.2, t0 + 0.14);
+      gain.gain.setValueAtTime(0.0001, t0);
+      gain.gain.exponentialRampToValueAtTime(0.045, t0 + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.26);
+      osc.start(t0);
+      osc.stop(t0 + 0.28);
+    }
+  } catch {
+    /* ignore */
+  }
 }
 
 function voiceDownloadGuideHtml() {
@@ -481,8 +575,10 @@ function jumpToBan() {
 }
 
 function toggleFavorite(id) {
-  if (favorites.has(id)) favorites.delete(id);
-  else favorites.add(id);
+  const adding = !favorites.has(id);
+  if (adding) favorites.add(id);
+  else favorites.delete(id);
+  playFavoriteSfx(adding);
   saveFavorites(favorites);
   if (route.mode === "favorites") {
     const list = buildStudyList(route);
@@ -629,7 +725,9 @@ function renderStudy() {
         <div class="study-header">
           <button class="icon-btn" data-go="#/" aria-label="返回">${iconBack()}</button>
           <div class="center"><strong>${studyTitle(route)}</strong><span>暂无词条</span></div>
-          <button class="icon-btn" data-go="${settingsHash}" aria-label="设置">${iconGear()}</button>
+          <div class="header-right">
+            <button class="icon-btn" data-go="${settingsHash}" aria-label="设置">${iconGear()}</button>
+          </div>
         </div>
         <div class="empty">
           ${route.mode === "favorites" ? "还没有收藏，去真题里点收藏吧" : "当前筛选下没有词条"}
@@ -652,7 +750,12 @@ function renderStudy() {
             timer ? ` · 睡觉 ${timer}` : ""
           }</span>
         </div>
-        <button class="icon-btn" data-go="${settingsHash}" aria-label="设置">${iconGear()}</button>
+        <div class="header-right">
+          <button type="button" class="header-auto-btn ${study.auto ? "is-auto" : ""}" id="autoBtn">
+            ${study.auto ? "暂停" : "自动播放"}
+          </button>
+          <button class="icon-btn" data-go="${settingsHash}" aria-label="设置">${iconGear()}</button>
+        </div>
       </div>
 
       <div class="jump-row">
@@ -693,8 +796,10 @@ function studyCardHtml(entry) {
       </div>
       <div class="word-main">${entry.word}</div>
       <div class="kana">${entry.kana}</div>
-      <div class="meaning">
-        <span class="label">中文意思</span>
+      <div class="meaning ${
+        !settings.dictation || study.revealMeaning ? "is-playable" : ""
+      }" data-play-zh="meaning">
+        <span class="label">中文意思${!settings.dictation || study.revealMeaning ? " · 点按朗读" : ""}</span>
         <div class="body">${entry.meaning}</div>
         ${
           settings.dictation && !study.revealMeaning
@@ -715,10 +820,7 @@ function studyCardHtml(entry) {
         }
       </div>
       <div class="action-row">
-        <button class="btn primary ${study.auto ? "is-auto" : ""}" id="autoBtn">
-          ${study.auto ? "暂停" : "自动播放"}
-        </button>
-        <button class="btn ghost ${fav ? "active" : ""}" id="favBtn">${
+        <button class="btn ghost fav-full ${fav ? "active" : ""}" id="favBtn">${
           fav ? "取消收藏" : "收藏"
         }</button>
       </div>
@@ -931,10 +1033,13 @@ function optionButtons(key, options, current, coerce = (v) => v) {
 function renderSettings() {
   const backHash = settingsBackHash();
   ensureSyncedJaVoice();
+  ensureSyncedZhVoice();
   const jaList = listJaVoices();
+  const zhList = listZhVoices();
   const voices = pickVoices(settings);
   const allCount = listAllVoices().length;
   const defaultVoice = getDefaultJaVoice();
+  const defaultZhVoice = getDefaultZhVoice();
   root.innerHTML = `
     <div class="shell">
       <div class="topbar">
@@ -950,13 +1055,27 @@ function renderSettings() {
           </div>
           <div class="option-row" style="margin-top:4px">
             <button type="button" class="option" id="refreshVoicesBtn">刷新音色列表</button>
-            <button type="button" class="option" id="previewVoiceBtn">试听当前音色</button>
+            <button type="button" class="option" id="previewVoiceBtn">试听日语</button>
           </div>
           <div style="margin-top:10px">${voiceDownloadGuideHtml()}</div>
           <div class="sub" style="color:var(--text-dim);font-size:0.82rem;line-height:1.45;margin-top:10px">
             本机日语 ${jaList.length} 个（系统默认：${
               defaultVoice ? voiceShortLabel(defaultVoice) : "无"
-            }）· 全部音色 ${allCount} · 中文：${voices.zhName}
+            }）· 全部音色 ${allCount}
+          </div>
+        </div>
+        <div class="setting-item">
+          <div class="head"><strong>中文音色</strong><span>当前：${voices.zhName}</span></div>
+          <div class="option-row">
+            ${zhVoiceOptionButtonsHtml()}
+          </div>
+          <div class="option-row" style="margin-top:4px">
+            <button type="button" class="option" id="previewZhVoiceBtn">试听中文</button>
+          </div>
+          <div class="sub" style="color:var(--text-dim);font-size:0.82rem;line-height:1.45;margin-top:10px">
+            本机中文 ${zhList.length} 个（列表默认：${
+              defaultZhVoice ? voiceShortLabel(defaultZhVoice) : "无"
+            }）· 点选后会试听；「系统中文默认」跟系统设置里的中文朗读声一致
           </div>
         </div>
         <div class="setting-item">
@@ -1107,9 +1226,32 @@ document.addEventListener("click", (e) => {
   const unmask = e.target.closest("[data-unmask]");
   if (unmask && study) {
     const kind = unmask.getAttribute("data-unmask");
-    if (kind === "meaning") study.revealMeaning = true;
+    if (kind === "meaning") {
+      study.revealMeaning = true;
+      unmask.remove();
+      const box = unmask.closest(".meaning");
+      if (box) {
+        box.classList.add("is-playable");
+        const label = box.querySelector(".label");
+        if (label && !label.textContent.includes("点按朗读")) {
+          label.textContent = "中文意思 · 点按朗读";
+        }
+      }
+      return;
+    }
     if (kind === "explain") study.revealExplain = true;
     unmask.remove();
+    return;
+  }
+
+  const playZh = e.target.closest("[data-play-zh]");
+  if (playZh && study?.list[study.index]) {
+    if (playZh.querySelector(".mask")) return;
+    const entry = study.list[study.index];
+    const text = entry.meaning || "";
+    if (!text) return;
+    unlockTTSFromGesture();
+    speakChineseText(text, settings);
     return;
   }
 
@@ -1130,6 +1272,14 @@ document.addEventListener("click", (e) => {
       previewJapaneseVoice(settings);
       if (value === "__system__") {
         showToast("已用系统日语默认。请确认系统里日语默认是 O-Ren/Otoya", 3600);
+      } else {
+        showToast("已切换并试听");
+      }
+    } else if (key === "zhVoiceURI") {
+      unlockTTSFromGesture();
+      previewChineseVoice(settings);
+      if (value === "__system__") {
+        showToast("已用系统中文默认", 2800);
       } else {
         showToast("已切换并试听");
       }
@@ -1172,16 +1322,23 @@ document.addEventListener("click", (e) => {
     unlockTTSFromGesture();
     window.speechSynthesis?.getVoices?.();
     ensureSyncedJaVoice();
+    ensureSyncedZhVoice();
     render();
     const ja = listJaVoices();
-    const names = ja.map((v) => voiceShortLabel(v)).join("、") || "无";
-    showToast(`日语 ${ja.length} 个：${names}`, 2800);
+    const zh = listZhVoices();
+    showToast(`日语 ${ja.length} · 中文 ${zh.length}`, 2800);
     return;
   }
   if (e.target.closest("#previewVoiceBtn")) {
     unlockTTSFromGesture();
     previewJapaneseVoice(settings);
-    showToast("试听中");
+    showToast("试听日语");
+    return;
+  }
+  if (e.target.closest("#previewZhVoiceBtn")) {
+    unlockTTSFromGesture();
+    previewChineseVoice(settings);
+    showToast("试听中文");
     return;
   }
 
@@ -1286,9 +1443,11 @@ document.addEventListener(
 
 onVoicesChanged(() => {
   ensureSyncedJaVoice();
+  ensureSyncedZhVoice();
   if (route.name === "settings") renderSettings();
 });
 
 ensureSyncedJaVoice();
+ensureSyncedZhVoice();
 setupStudySwipeOnce();
 render();

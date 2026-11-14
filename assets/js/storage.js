@@ -14,6 +14,8 @@ export const defaultSettings = {
   filterType: "全部",
   // iPhone 默认走系统日语默认（不指定 voice），才有机会用到网页列不出的 O-Ren/Otoya
   jaVoiceURI: "__system__",
+  // 中文同理：优先系统中文默认
+  zhVoiceURI: "__system__",
 };
 
 export function loadSettings() {
